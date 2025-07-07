@@ -7,9 +7,9 @@ export default function Home() {
         {/* Hero Section */}
         <div className="text-center mb-16">
           <h1 className="text-7xl font-bold text-white mb-6">
-            Music
+            Musi
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-              MEisi
+              Card
             </span>
           </h1>
           <p className="text-slate-300 text-xl mb-8 max-w-2xl mx-auto">
