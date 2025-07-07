@@ -1,6 +1,6 @@
-# Contributing to MusicMEisi
+# Contributing to MusiCard
 
-Thank you for your interest in contributing to MusicMEisi! This document provides guidelines for contributing to this project.
+Thank you for your interest in contributing to MusiCard! This document provides guidelines for contributing to this project.
 
 ## How to Contribute
 
@@ -20,7 +20,7 @@ Thank you for your interest in contributing to MusicMEisi! This document provide
 
 #### Setting Up Development Environment
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/yourusername/MusicMEisi.git`
+2. Clone your fork: `git clone https://github.com/yourusername/musi-card.git`
 3. Install dependencies: `npm install`
 4. Create a feature branch: `git checkout -b feature/your-feature-name`
 
@@ -56,4 +56,4 @@ Thank you for your interest in contributing to MusicMEisi! This document provide
 
 If you have questions about contributing, feel free to open an issue or contact the maintainers.
 
-Thank you for contributing to MusicMEisi! 🎵 
+Thank you for contributing to MusiCard! 🎵 

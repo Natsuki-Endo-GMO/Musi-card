@@ -157,7 +157,7 @@ export default function UserPage() {
           <p className="text-slate-400 text-sm">
             Powered by{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-semibold">
-              MusicMEisi
+              MusiCard
             </span>
           </p>
         </div>
