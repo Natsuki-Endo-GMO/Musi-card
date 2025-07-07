@@ -1,5 +1,11 @@
 # MusicMEisi - 音楽名刺サービス
 
+[![React](https://img.shields.io/badge/React-18.2.0-61DAFB?logo=react)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.2.2-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-4.5.0-646CFF?logo=vite)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.3.5-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
+[![License](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
+
 SNSのbioに好きな音楽のジャケット画像を含む自己紹介ページ（音楽名刺）を作成できるサービスです。
 
 ## 機能
