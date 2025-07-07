@@ -47,6 +47,8 @@ cp env.example .env
 VITE_LASTFM_API_KEY=your_lastfm_api_key_here
 ```
 
+**⚠️ 注意**: `.env`ファイルはGitにコミットしないでください。機密情報が含まれています。
+
 #### Last.fm APIキーの取得方法
 1. [Last.fm API](https://www.last.fm/api/account/create)にアクセス
 2. アカウントを作成またはログイン
