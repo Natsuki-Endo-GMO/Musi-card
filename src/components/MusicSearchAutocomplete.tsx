@@ -149,7 +149,7 @@ export default function MusicSearchAutocomplete({
               }`}
             >
               {/* ジャケット画像 */}
-              <div className="flex-shrink-0 w-12 h-12 mr-3">
+              <div className="flex-shrink-0 w-12 h-12 mr-3 relative">
                 <img
                   src={result.image || `https://picsum.photos/48/48?random=${index}`}
                   alt={`${result.name} by ${result.artist}`}
@@ -159,6 +159,12 @@ export default function MusicSearchAutocomplete({
                     target.src = `https://picsum.photos/48/48?random=${index}`
                   }}
                 />
+                {/* 生成画像のインジケーター */}
+                {result.isGeneratedImage && (
+                  <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs px-1 py-0.5 rounded-full">
+                    AI
+                  </div>
+                )}
               </div>
               
               {/* 曲情報 */}

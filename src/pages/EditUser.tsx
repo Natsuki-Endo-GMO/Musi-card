@@ -7,6 +7,7 @@ interface Song {
   title: string
   artist: string
   jacket: string
+  isGeneratedImage?: boolean
 }
 
 export default function EditUser() {
@@ -54,9 +55,9 @@ export default function EditUser() {
     }
   }
 
-  const updateSong = (index: number, field: keyof Song, value: string) => {
+  const updateSong = (index: number, field: keyof Song, value: string | boolean) => {
     const newSongs = [...songs]
-    newSongs[index][field] = value
+    newSongs[index] = { ...newSongs[index], [field]: value }
     setSongs(newSongs)
   }
 
@@ -65,7 +66,8 @@ export default function EditUser() {
     newSongs[index] = {
       title: result.name,
       artist: result.artist,
-      jacket: result.image || ''
+      jacket: result.image || '',
+      isGeneratedImage: result.isGeneratedImage
     }
     setSongs(newSongs)
   }
