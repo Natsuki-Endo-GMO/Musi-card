@@ -27,6 +27,7 @@ export default function ManageUsers() {
         setUsers(JSON.parse(storedData))
       }
     } catch (error) {
+      // eslint-disable-next-line no-console -- ユーザーデータ読込失敗時のデバッグ用
       console.error('ユーザーデータの読み込みに失敗しました:', error)
     } finally {
       setLoading(false)

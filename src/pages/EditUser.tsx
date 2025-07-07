@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import MusicSearchAutocomplete from '../components/MusicSearchAutocomplete'
 import { SearchResult } from '../services/musicSearch'
@@ -15,13 +15,7 @@ export default function EditUser() {
   const [songs, setSongs] = useState<Song[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (username) {
-      loadUserData(username)
-    }
-  }, [username])
-
-  const loadUserData = (username: string) => {
+  const loadUserData = useCallback((username: string) => {
     try {
       const storedData = localStorage.getItem('musicmeisi_users')
       if (storedData) {
@@ -42,7 +36,13 @@ export default function EditUser() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [navigate])
+
+  useEffect(() => {
+    if (username) {
+      loadUserData(username)
+    }
+  }, [username, loadUserData])
 
   const addSong = () => {
     setSongs([...songs, { title: '', artist: '', jacket: '' }])

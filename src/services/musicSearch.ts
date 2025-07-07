@@ -32,6 +32,7 @@ export const searchMusic = async (query: string): Promise<SearchResult[]> => {
     })
 
     const tracks = response.data.results?.trackmatches?.track || []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Last.fm APIのレスポンス型が不定のため
     return tracks.map((track: any) => ({
       name: track.name,
       artist: track.artist,
@@ -39,6 +40,7 @@ export const searchMusic = async (query: string): Promise<SearchResult[]> => {
       url: track.url
     }))
   } catch (error) {
+    // eslint-disable-next-line no-console -- APIエラー時のデバッグ用
     console.error('音楽検索エラー:', error)
     return []
   }
@@ -58,6 +60,7 @@ export const searchAlbum = async (query: string): Promise<AlbumSearchResult[]> =
     })
 
     const albums = response.data.results?.albummatches?.album || []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Last.fm APIのレスポンス型が不定のため
     return albums.map((album: any) => ({
       name: album.name,
       artist: album.artist,
@@ -65,6 +68,7 @@ export const searchAlbum = async (query: string): Promise<AlbumSearchResult[]> =
       url: album.url
     }))
   } catch (error) {
+    // eslint-disable-next-line no-console -- APIエラー時のデバッグ用
     console.error('アルバム検索エラー:', error)
     return []
   }

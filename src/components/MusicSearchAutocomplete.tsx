@@ -36,6 +36,7 @@ export default function MusicSearchAutocomplete({
         setShowDropdown(searchResults.length > 0)
         setSelectedIndex(-1)
       } catch (error) {
+        // eslint-disable-next-line no-console -- APIエラー時のデバッグ用
         console.error('検索エラー:', error)
         setResults([])
         setShowDropdown(false)

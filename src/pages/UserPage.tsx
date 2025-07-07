@@ -39,6 +39,7 @@ export default function UserPage() {
         setSongs([])
       }
     } catch (error) {
+      // eslint-disable-next-line no-console -- ユーザーデータ読込失敗時のデバッグ用
       console.error('ユーザーデータの読み込みに失敗しました:', error)
       setSongs([])
     } finally {
