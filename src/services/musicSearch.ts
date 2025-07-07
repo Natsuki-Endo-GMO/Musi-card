@@ -94,7 +94,6 @@ export const searchAlbum = async (query: string): Promise<AlbumSearchResult[]> =
 // 画像の代替手段を提供する関数
 const getFallbackImage = (trackName: string, artistName: string): { image: string; isGenerated: boolean } => {
   // より良い代替画像サービスを使用
-  const encodedTrack = encodeURIComponent(`${trackName} ${artistName}`)
   return {
     image: `https://picsum.photos/300/300?random=${Math.floor(Math.random() * 1000)}`,
     isGenerated: true
