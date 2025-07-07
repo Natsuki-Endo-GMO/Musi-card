@@ -1,0 +1,41 @@
+{
+  "alice": [
+    {
+      "title": "Shape of You",
+      "artist": "Ed Sheeran",
+      "jacket": "https://picsum.photos/300/300?random=1"
+    },
+    {
+      "title": "Blinding Lights",
+      "artist": "The Weeknd",
+      "jacket": "https://picsum.photos/300/300?random=2"
+    },
+    {
+      "title": "As It Was",
+      "artist": "Harry Styles",
+      "jacket": "https://picsum.photos/300/300?random=3"
+    },
+    {
+      "title": "Good 4 U",
+      "artist": "Olivia Rodrigo",
+      "jacket": "https://picsum.photos/300/300?random=4"
+    }
+  ],
+  "bob": [
+    {
+      "title": "Pretender",
+      "artist": "Official髭男dism",
+      "jacket": "https://picsum.photos/300/300?random=5"
+    },
+    {
+      "title": "紅蓮華",
+      "artist": "LiSA",
+      "jacket": "https://picsum.photos/300/300?random=6"
+    },
+    {
+      "title": "猫",
+      "artist": "DISH//",
+      "jacket": "https://picsum.photos/300/300?random=7"
+    }
+  ]
+} 
