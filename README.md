@@ -138,6 +138,25 @@ ISC License
 
 プルリクエストやイシューの報告を歓迎します！
 
+## デプロイ
+
+### Vercel（推奨）
+1. [Vercel](https://vercel.com)にサインアップ
+2. GitHubリポジトリを連携
+3. 環境変数を設定（VITE_LASTFM_API_KEY）
+4. 自動デプロイ完了
+
+### Netlify
+1. [Netlify](https://netlify.com)にサインアップ
+2. GitHubリポジトリを連携
+3. 環境変数を設定
+4. 自動デプロイ完了
+
+### GitHub Pages
+1. リポジトリのSettings > Pages
+2. SourceをGitHub Actionsに設定
+3. 自動デプロイ完了
+
 ## 今後の予定
 
 - [ ] Spotify API連携
