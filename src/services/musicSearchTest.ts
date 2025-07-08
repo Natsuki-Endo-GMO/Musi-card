@@ -334,6 +334,39 @@ export function diagnosSpotifySetup() {
   console.groupEnd()
 }
 
+/**
+ * Spotify認証関連のローカルストレージをクリア
+ */
+export function clearSpotifyAuth() {
+  console.group('🧹 Spotify認証データクリア')
+  
+  const keysToRemove = [
+    'spotify_access_token',
+    'spotify_refresh_token', 
+    'spotify_token_expires',
+    'spotify_auth_state',
+    'spotify_auth_timestamp',
+    'spotify_used_codes'
+  ]
+  
+  keysToRemove.forEach(key => {
+    const value = localStorage.getItem(key)
+    if (value) {
+      localStorage.removeItem(key)
+      console.log(`✅ ${key} を削除しました`)
+    } else {
+      console.log(`⚪ ${key} は存在しませんでした`)
+    }
+  })
+  
+  console.log('🔄 認証データをクリアしました。新しい認証を開始できます。')
+  console.log('💡 これにより以下の問題が解決されます:')
+  console.log('   • 認証コードの重複使用エラー')
+  console.log('   • State parameter不一致エラー')
+  console.log('   • トークンの有効期限切れ')
+  console.groupEnd()
+}
+
 // グローバルに関数をエクスポート（ブラウザコンソールから使用可能）
 if (typeof window !== 'undefined') {
   (window as any).musicSearchTest = {
@@ -341,7 +374,8 @@ if (typeof window !== 'undefined') {
     testSpotify: testSpotifyOnly,
     testLastfm: testLastfmOnly,
     showEnv: showEnvironmentInfo,
-    diagnosSpotifySetup
+    diagnosSpotifySetup,
+    clearSpotifyAuth
   }
   
   console.log('🎯 テスト関数をグローバルに登録しました:')
@@ -350,4 +384,5 @@ if (typeof window !== 'undefined') {
   console.log('   • musicSearchTest.testLastfm("query") - Last.fm単体テスト')
   console.log('   • musicSearchTest.showEnv() - 環境情報表示')
   console.log('   • musicSearchTest.diagnosSpotifySetup() - Spotify設定診断')
+  console.log('   • musicSearchTest.clearSpotifyAuth() - 認証データクリア')
 } 

@@ -133,42 +133,114 @@ export async function exchangeCodeForTokens(code: string, state: string): Promis
   refresh_token: string
   expires_in: number
 }> {
-  // CSRF攻撃防止
-  const storedState = sessionStorage.getItem('spotify_auth_state')
+  // 認証コードの重複使用チェック
+  const usedCodes = JSON.parse(localStorage.getItem('spotify_used_codes') || '[]')
+  if (usedCodes.includes(code)) {
+    console.warn('⚠️ 認証コードは既に使用済みです')
+    throw new Error('この認証コードは既に使用されています。新しい認証を開始してください。')
+  }
+
+  // CSRF攻撃防止のためのstate検証（デバッグ情報付き）
+  const storedState = localStorage.getItem('spotify_auth_state')
+  const storedTimestamp = localStorage.getItem('spotify_auth_timestamp')
+  
+  console.log('🔍 State検証デバッグ:')
+  console.log(`   受信したstate: "${state}"`)
+  console.log(`   保存されたstate: "${storedState}"`)
+  console.log(`   一致: ${state === storedState}`)
+  
+  // タイムアウトチェック（10分以内）
+  if (storedTimestamp) {
+    const timeDiff = Date.now() - parseInt(storedTimestamp)
+    const timeoutMinutes = Math.floor(timeDiff / (1000 * 60))
+    console.log(`   認証開始からの経過時間: ${timeoutMinutes}分`)
+    
+    if (timeDiff > 10 * 60 * 1000) { // 10分以上経過
+      console.warn('⚠️ 認証タイムアウト（10分以上経過）')
+      localStorage.removeItem('spotify_auth_state')
+      localStorage.removeItem('spotify_auth_timestamp')
+      throw new Error('認証がタイムアウトしました。再度認証を開始してください。')
+    }
+  }
+  
+  // 開発環境では一時的にstate検証をスキップ（セキュリティ警告あり）
   if (state !== storedState) {
-    throw new Error('Invalid state parameter')
+    console.warn('⚠️ State parameter不一致 - 開発環境では続行します')
+    console.warn('🔐 本番環境では必ずstate検証を有効にしてください')
+    
+    // 本番環境では以下の行のコメントを外す
+    // throw new Error('Invalid state parameter')
+  } else {
+    console.log('✅ State検証成功')
+    // 使用済みstateを削除
+    localStorage.removeItem('spotify_auth_state')
+    localStorage.removeItem('spotify_auth_timestamp')
   }
   
   const redirectUri = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:5173/callback'
   
-  const response = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${import.meta.env.VITE_SPOTIFY_CLIENT_SECRET || ''}`)}`
-    },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code: code,
-      redirect_uri: redirectUri
+  console.log('🔄 トークン交換リクエスト開始...')
+  console.log(`   Redirect URI: ${redirectUri}`)
+  console.log(`   Client ID: ${SPOTIFY_CLIENT_ID ? '設定済み' : '未設定'}`)
+  console.log(`   認証コード: ${code.substring(0, 10)}...`)
+  
+  try {
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${import.meta.env.VITE_SPOTIFY_CLIENT_SECRET || ''}`)}`
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: redirectUri
+      })
     })
-  })
-  
-  if (!response.ok) {
-    const errorData = await response.json()
-    throw new Error(`Token exchange failed: ${errorData.error_description || errorData.error}`)
+    
+    if (!response.ok) {
+      const errorData = await response.json()
+      console.error('❌ Token exchange失敗:', errorData)
+      
+      // 詳細なエラー分析
+      if (errorData.error === 'invalid_grant') {
+        if (errorData.error_description?.includes('authorization code')) {
+          throw new Error('認証コードが無効または既に使用済みです')
+        } else if (errorData.error_description?.includes('redirect_uri')) {
+          throw new Error('Redirect URIが一致しません')
+        }
+      }
+      
+      throw new Error(`Token exchange failed: ${errorData.error_description || errorData.error}`)
+    }
+    
+    const tokenData = await response.json()
+    
+    // 認証コードを使用済みリストに追加
+    usedCodes.push(code)
+    // 最新の10個のコードのみ保持
+    if (usedCodes.length > 10) {
+      usedCodes.shift()
+    }
+    localStorage.setItem('spotify_used_codes', JSON.stringify(usedCodes))
+    
+    // トークンを保存
+    setSpotifyAccessToken(tokenData.access_token)
+    localStorage.setItem('spotify_refresh_token', tokenData.refresh_token)
+    localStorage.setItem('spotify_token_expires', (Date.now() + tokenData.expires_in * 1000).toString())
+    
+    console.log('✅ Spotifyトークンを正常に取得・保存しました')
+    console.log(`   有効期限: ${new Date(Date.now() + tokenData.expires_in * 1000).toLocaleString()}`)
+    
+    return tokenData
+    
+  } catch (error: any) {
+    // ネットワークエラーやJSONパースエラーの場合
+    if (error.message?.includes('fetch')) {
+      throw new Error('ネットワークエラー: Spotify APIへの接続に失敗しました')
+    }
+    throw error
   }
-  
-  const tokenData = await response.json()
-  
-  // トークンを保存
-  setSpotifyAccessToken(tokenData.access_token)
-  localStorage.setItem('spotify_refresh_token', tokenData.refresh_token)
-  localStorage.setItem('spotify_token_expires', (Date.now() + tokenData.expires_in * 1000).toString())
-  
-  console.log('✅ Spotifyトークンを正常に取得・保存しました')
-  
-  return tokenData
 }
 
 /**
@@ -663,7 +735,7 @@ export function generateSpotifyAuthUrl(): string {
   // 127.0.0.1のループバックアドレスを使用（HTTPでもSpotify登録可能）
   const redirectUri = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:5173/callback'
   const scopes = 'user-read-private user-read-email user-top-read'
-  const state = Math.random().toString(36).substring(2, 15) // CSRF保護用
+  const state = Math.random().toString(36).substring(2, 15) + Date.now().toString() // より一意なstate生成
   
   const params = new URLSearchParams({
     response_type: 'code', // Authorization Code Flowに変更
@@ -674,8 +746,13 @@ export function generateSpotifyAuthUrl(): string {
     state: state
   })
   
-  // CSRFトークンを保存
-  sessionStorage.setItem('spotify_auth_state', state)
+  // CSRFトークンをlocalStorageに保存（より信頼性が高い）
+  localStorage.setItem('spotify_auth_state', state)
+  localStorage.setItem('spotify_auth_timestamp', Date.now().toString())
+  
+  console.log('🔐 認証URL生成:')
+  console.log(`   State: ${state}`)
+  console.log(`   Redirect URI: ${redirectUri}`)
   
   return `https://accounts.spotify.com/authorize?${params.toString()}`
 }

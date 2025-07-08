@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { exchangeCodeForTokens, setMusicProvider } from '../services/musicSearch'
 
@@ -7,14 +7,28 @@ export default function SpotifyCallback() {
   const navigate = useNavigate()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
+  const processedRef = useRef(false) // 重複処理防止
 
   useEffect(() => {
     const handleCallback = async () => {
+      // 既に処理済みの場合は実行しない
+      if (processedRef.current) {
+        console.log('🔄 認証処理は既に実行済みです')
+        return
+      }
+      
+      processedRef.current = true
+
       try {
         // URLパラメータから認証コードとstateを取得
         const code = searchParams.get('code')
         const state = searchParams.get('state')
         const error = searchParams.get('error')
+
+        console.log('🔍 コールバックパラメータ確認:')
+        console.log(`   code: ${code ? '✅ あり' : '❌ なし'}`)
+        console.log(`   state: ${state ? '✅ あり' : '❌ なし'}`)
+        console.log(`   error: ${error || 'なし'}`)
 
         if (error) {
           throw new Error(`Spotify認証エラー: ${error}`)
@@ -39,6 +53,9 @@ export default function SpotifyCallback() {
         setStatus('success')
         setMessage(`Spotify認証が完了しました！アクセストークンの有効期限: ${Math.floor(tokenData.expires_in / 60)}分`)
 
+        // URLから認証パラメータを削除（認証コードの再利用防止）
+        window.history.replaceState({}, document.title, '/callback')
+
         // 3秒後にホームページにリダイレクト
         setTimeout(() => {
           navigate('/')
@@ -52,9 +69,17 @@ export default function SpotifyCallback() {
         // 詳細なエラー情報をコンソールに出力
         if (error.message?.includes('Token exchange failed')) {
           console.error('🔍 トークン交換エラーの詳細:')
+          console.error('   • 認証コードが既に使用済みの可能性')
           console.error('   • Client IDまたはSecretが間違っている可能性')
           console.error('   • Redirect URIが正確に設定されていない可能性')
-          console.error('   • Spotify Developer Dashboardの設定を確認してください')
+          console.error('   • 認証コードの有効期限（10分）が切れている可能性')
+        }
+        
+        if (error.message?.includes('Invalid authorization code')) {
+          console.warn('⚠️ 認証コードが無効です。新しい認証を開始してください。')
+          setTimeout(() => {
+            navigate('/')
+          }, 5000)
         }
       }
     }
@@ -73,7 +98,8 @@ export default function SpotifyCallback() {
                 🎧 Spotify認証処理中...
               </h1>
               <p className="text-blue-600">
-                認証コードをアクセストークンに交換しています...
+                認証コードをアクセストークンに交換しています...<br/>
+                <span className="text-sm text-blue-500">重複処理を防止中</span>
               </p>
             </>
           )}
@@ -95,7 +121,8 @@ export default function SpotifyCallback() {
                 <p className="text-green-700 text-sm">
                   ✅ 音楽検索でSpotifyが利用可能になりました<br/>
                   ✅ リフレッシュトークンによる自動更新対応<br/>
-                  ✅ より高精度な検索結果を提供
+                  ✅ より高精度な検索結果を提供<br/>
+                  ✅ 認証コードの重複使用を防止
                 </p>
               </div>
               <p className="text-blue-500 text-sm">
@@ -120,9 +147,11 @@ export default function SpotifyCallback() {
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
                 <p className="text-red-700 text-sm text-left">
                   <strong>🔍 よくある解決方法:</strong><br/>
+                  • 認証コードの重複使用（ページリロード等）<br/>
                   • Spotify Developer Dashboardでredirect_uriを確認<br/>
                   • Client IDとSecretが正しく設定されているか確認<br/>
-                  • ブラウザのキャッシュをクリアして再試行
+                  • ブラウザのキャッシュをクリアして再試行<br/>
+                  • 認証コードの有効期限（10分）内に処理を完了
                 </p>
               </div>
               <button
