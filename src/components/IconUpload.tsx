@@ -20,7 +20,9 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
   const [isUploading, setIsUploading] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [isResizing, setIsResizing] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [resizeStart, setResizeStart] = useState({ size: 0, mouseX: 0, mouseY: 0 })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -118,28 +120,56 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
 
   // マウス移動処理
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !imageRef.current) return
+    if (!isDragging && !isResizing) return
+    if (!imageRef.current) return
     
-    const imageRect = imageRef.current.getBoundingClientRect()
-    const imageX = ((e.clientX - imageRect.left) / imageRect.width) * 100
-    const imageY = ((e.clientY - imageRect.top) / imageRect.height) * 100
-    
-    // 正方形サイズを考慮した境界チェック
-    const imageSize = getCurrentImageSize()
-    const minSize = Math.min(imageSize.width, imageSize.height)
-    const squareSizePercent = (cropArea.size / 100) * minSize
-    const maxXPercent = ((imageSize.width - squareSizePercent) / imageSize.width) * 100
-    const maxYPercent = ((imageSize.height - squareSizePercent) / imageSize.height) * 100
-    
-    const newX = Math.max(0, Math.min(maxXPercent, imageX - dragStart.x))
-    const newY = Math.max(0, Math.min(maxYPercent, imageY - dragStart.y))
-    
-    setCropArea(prev => ({ ...prev, x: newX, y: newY }))
+    if (isResizing) {
+      // リサイズ処理
+      const deltaY = e.clientY - resizeStart.mouseY
+      const imageSize = getCurrentImageSize()
+      const minSize = Math.min(imageSize.width, imageSize.height)
+      
+      // Y軸の移動量をサイズ変更量に変換（下に移動すると拡大、上に移動すると縮小）
+      const sizeDelta = (deltaY / minSize) * 100
+      let newSize = resizeStart.size + sizeDelta
+      
+      // サイズの最小値と最大値を制限（10%から100%まで）
+      newSize = Math.max(10, Math.min(100, newSize))
+      
+      // リサイズ時に枠が画像範囲外に出ないように位置を調整
+      const newSquareSize = (newSize / 100) * minSize
+      const maxXPercent = ((imageSize.width - newSquareSize) / imageSize.width) * 100
+      const maxYPercent = ((imageSize.height - newSquareSize) / imageSize.height) * 100
+      
+      setCropArea(prev => ({
+        size: newSize,
+        x: Math.min(prev.x, maxXPercent),
+        y: Math.min(prev.y, maxYPercent)
+      }))
+    } else if (isDragging) {
+      // ドラッグ処理（移動）
+      const imageRect = imageRef.current.getBoundingClientRect()
+      const imageX = ((e.clientX - imageRect.left) / imageRect.width) * 100
+      const imageY = ((e.clientY - imageRect.top) / imageRect.height) * 100
+      
+      // 正方形サイズを考慮した境界チェック
+      const imageSize = getCurrentImageSize()
+      const minSize = Math.min(imageSize.width, imageSize.height)
+      const squareSizePercent = (cropArea.size / 100) * minSize
+      const maxXPercent = ((imageSize.width - squareSizePercent) / imageSize.width) * 100
+      const maxYPercent = ((imageSize.height - squareSizePercent) / imageSize.height) * 100
+      
+      const newX = Math.max(0, Math.min(maxXPercent, imageX - dragStart.x))
+      const newY = Math.max(0, Math.min(maxYPercent, imageY - dragStart.y))
+      
+      setCropArea(prev => ({ ...prev, x: newX, y: newY }))
+    }
   }
 
   // マウスアップ処理
   const handleMouseUp = () => {
     setIsDragging(false)
+    setIsResizing(false)
   }
 
   // タッチ開始処理
@@ -160,30 +190,59 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
 
   // タッチ移動処理
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || !imageRef.current) return
+    if (!isDragging && !isResizing) return
+    if (!imageRef.current) return
     
     e.preventDefault()
     const touch = e.touches[0]
-    const imageRect = imageRef.current.getBoundingClientRect()
-    const imageX = ((touch.clientX - imageRect.left) / imageRect.width) * 100
-    const imageY = ((touch.clientY - imageRect.top) / imageRect.height) * 100
     
-    // 正方形サイズを考慮した境界チェック
-    const imageSize = getCurrentImageSize()
-    const minSize = Math.min(imageSize.width, imageSize.height)
-    const squareSizePercent = (cropArea.size / 100) * minSize
-    const maxXPercent = ((imageSize.width - squareSizePercent) / imageSize.width) * 100
-    const maxYPercent = ((imageSize.height - squareSizePercent) / imageSize.height) * 100
-    
-    const newX = Math.max(0, Math.min(maxXPercent, imageX - dragStart.x))
-    const newY = Math.max(0, Math.min(maxYPercent, imageY - dragStart.y))
-    
-    setCropArea(prev => ({ ...prev, x: newX, y: newY }))
+    if (isResizing) {
+      // リサイズ処理
+      const deltaY = touch.clientY - resizeStart.mouseY
+      const imageSize = getCurrentImageSize()
+      const minSize = Math.min(imageSize.width, imageSize.height)
+      
+      // Y軸の移動量をサイズ変更量に変換
+      const sizeDelta = (deltaY / minSize) * 100
+      let newSize = resizeStart.size + sizeDelta
+      
+      // サイズの最小値と最大値を制限
+      newSize = Math.max(10, Math.min(100, newSize))
+      
+      // リサイズ時に枠が画像範囲外に出ないように位置を調整
+      const newSquareSize = (newSize / 100) * minSize
+      const maxXPercent = ((imageSize.width - newSquareSize) / imageSize.width) * 100
+      const maxYPercent = ((imageSize.height - newSquareSize) / imageSize.height) * 100
+      
+      setCropArea(prev => ({
+        size: newSize,
+        x: Math.min(prev.x, maxXPercent),
+        y: Math.min(prev.y, maxYPercent)
+      }))
+    } else if (isDragging) {
+      // ドラッグ処理（移動）
+      const imageRect = imageRef.current.getBoundingClientRect()
+      const imageX = ((touch.clientX - imageRect.left) / imageRect.width) * 100
+      const imageY = ((touch.clientY - imageRect.top) / imageRect.height) * 100
+      
+      // 正方形サイズを考慮した境界チェック
+      const imageSize = getCurrentImageSize()
+      const minSize = Math.min(imageSize.width, imageSize.height)
+      const squareSizePercent = (cropArea.size / 100) * minSize
+      const maxXPercent = ((imageSize.width - squareSizePercent) / imageSize.width) * 100
+      const maxYPercent = ((imageSize.height - squareSizePercent) / imageSize.height) * 100
+      
+      const newX = Math.max(0, Math.min(maxXPercent, imageX - dragStart.x))
+      const newY = Math.max(0, Math.min(maxYPercent, imageY - dragStart.y))
+      
+      setCropArea(prev => ({ ...prev, x: newX, y: newY }))
+    }
   }
 
   // タッチ終了処理
   const handleTouchEnd = () => {
     setIsDragging(false)
+    setIsResizing(false)
   }
 
   // トリミング実行
@@ -196,15 +255,23 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
       const ctx = canvas.getContext('2d')
       if (!ctx) return
 
+      // 画像の実際のサイズと表示サイズの比率
       const scaleX = imageRef.current.naturalWidth / imageRef.current.width
       const scaleY = imageRef.current.naturalHeight / imageRef.current.height
 
-      const cropSize = (cropArea.size / 100) * imageRef.current.width
+      // 表示サイズでの短辺を取得
+      const displayMinSize = Math.min(imageRef.current.width, imageRef.current.height)
+      
+      // 正方形のサイズを短辺基準で計算（表示枠と同じ計算）
+      const cropSize = (cropArea.size / 100) * displayMinSize
       const cropX = (cropArea.x / 100) * imageRef.current.width
       const cropY = (cropArea.y / 100) * imageRef.current.height
 
-      canvas.width = cropSize
-      canvas.height = cropSize
+      // 実際の画像での正方形サイズ
+      const actualCropSize = cropSize * Math.min(scaleX, scaleY)
+
+      canvas.width = actualCropSize
+      canvas.height = actualCropSize
 
       ctx.drawImage(
         imageRef.current,
@@ -214,8 +281,8 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
         cropSize * scaleY,
         0,
         0,
-        cropSize,
-        cropSize
+        actualCropSize,
+        actualCropSize
       )
 
       const croppedImageUrl = canvas.toDataURL('image/jpeg', 0.9)
@@ -252,6 +319,31 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+  }
+
+  // リサイズ開始処理
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsResizing(true)
+    setResizeStart({
+      size: cropArea.size,
+      mouseX: e.clientX,
+      mouseY: e.clientY
+    })
+  }
+
+  // タッチでのリサイズ開始処理
+  const handleResizeTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const touch = e.touches[0]
+    setIsResizing(true)
+    setResizeStart({
+      size: cropArea.size,
+      mouseX: touch.clientX,
+      mouseY: touch.clientY
+    })
   }
 
   // モーダルコンポーネント
@@ -304,6 +396,8 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
                 トリミング枠情報
                 <div>位置: {cropArea.x.toFixed(1)}%, {cropArea.y.toFixed(1)}%</div>
                 <div>サイズ: {cropArea.size}%</div>
+                <div>ドラッグ中: {isDragging ? 'Yes' : 'No'}</div>
+                <div>リサイズ中: {isResizing ? 'Yes' : 'No'}</div>
                 <div>
                   {(() => {
                     const squareSize = (cropArea.size / 100) * debugMinSize
@@ -323,6 +417,19 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
                   }
                 </div>
                 <div>制限値: {Math.round(debugMinSize)}px</div>
+                <br />
+                トリミング予定範囲
+                <div>
+                  {(() => {
+                    if (!imageRef.current) return 'N/A'
+                    const scaleX = imageRef.current.naturalWidth / imageRef.current.width
+                    const scaleY = imageRef.current.naturalHeight / imageRef.current.height
+                    const displayMinSize = Math.min(imageRef.current.width, imageRef.current.height)
+                    const cropSize = (cropArea.size / 100) * displayMinSize
+                    const actualCropSize = cropSize * Math.min(scaleX, scaleY)
+                    return `最終出力: ${Math.round(actualCropSize)}px × ${Math.round(actualCropSize)}px`
+                  })()}
+                </div>
               </div>
             )
           })()}
@@ -330,7 +437,11 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
           <div className={`mb-6 ${isMobile ? 'flex-1 flex items-center justify-center' : ''}`}>
             <div 
               ref={containerRef}
-              className={`relative inline-block ${isDragging ? 'cursor-grabbing' : 'cursor-move'}`}
+              className={`relative inline-block ${
+                isResizing ? 'cursor-se-resize' : 
+                isDragging ? 'cursor-grabbing' : 
+                'cursor-move'
+              }`}
               style={{
                 maxWidth: isMobile ? '100%' : '100%',
                 maxHeight: isMobile ? '60vh' : '24rem'
@@ -371,30 +482,28 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
                       top: `${cropTop}px`,
                       width: `${squareSize}px`,
                       height: `${squareSize}px`,
-                      cursor: isDragging ? 'grabbing' : 'move',
-                      transition: isDragging ? 'none' : 'all 0.1s ease',
+                      cursor: isResizing ? 'se-resize' : isDragging ? 'grabbing' : 'move',
+                      transition: isDragging || isResizing ? 'none' : 'all 0.1s ease',
                       borderRadius: '50%',
                       zIndex: 10,
                       pointerEvents: 'auto'
                     }}
                     title={`正方形サイズ: ${Math.round(squareSize)}px × ${Math.round(squareSize)}px`}
                   >
-                    {/* ドラッグハンドル */}
+                    {/* リサイズハンドル - 右下のみ使用 */}
                     <div 
-                      className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"
+                      className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-se-resize hover:bg-blue-600 transition-colors"
                       style={{ zIndex: 15 }}
+                      onMouseDown={handleResizeStart}
+                      onTouchStart={handleResizeTouchStart}
+                      title="ドラッグしてサイズを変更"
                     />
+                    
+                    {/* 移動用のドラッグエリア（中央部分） */}
                     <div 
-                      className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"
-                      style={{ zIndex: 15 }}
-                    />
-                    <div 
-                      className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"
-                      style={{ zIndex: 15 }}
-                    />
-                    <div 
-                      className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"
-                      style={{ zIndex: 15 }}
+                      className="absolute inset-2 cursor-move rounded-full"
+                      style={{ zIndex: 12 }}
+                      title="ドラッグして移動"
                     />
                   </div>
                 )
