@@ -9,9 +9,14 @@ interface Song {
   isGeneratedImage?: boolean
 }
 
+interface UserData {
+  icon?: string
+  songs: Song[]
+}
+
 export default function UserPage() {
   const { username } = useParams<{ username: string }>()
-  const [songs, setSongs] = useState<Song[]>([])
+  const [userData, setUserData] = useState<UserData>({ songs: [] })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -27,7 +32,13 @@ export default function UserPage() {
       if (storedData) {
         const users = JSON.parse(storedData)
         if (users[username]) {
-          setSongs(users[username])
+          // 新しいデータ構造に対応
+          if (typeof users[username] === 'object' && users[username].songs) {
+            setUserData(users[username])
+          } else {
+            // 古いデータ構造（後方互換性）
+            setUserData({ songs: users[username] })
+          }
           setLoading(false)
           return
         }
@@ -35,14 +46,14 @@ export default function UserPage() {
 
       // ローカルストレージにない場合はサンプルデータから検索
       if (usersData[username as keyof typeof usersData]) {
-        setSongs(usersData[username as keyof typeof usersData])
+        setUserData({ songs: usersData[username as keyof typeof usersData] })
       } else {
-        setSongs([])
+        setUserData({ songs: [] })
       }
     } catch (error) {
       // eslint-disable-next-line no-console -- ユーザーデータ読込失敗時のデバッグ用
       console.error('ユーザーデータの読み込みに失敗しました:', error)
-      setSongs([])
+      setUserData({ songs: [] })
     } finally {
       setLoading(false)
     }
@@ -56,7 +67,7 @@ export default function UserPage() {
     )
   }
 
-  if (!username || songs.length === 0) {
+  if (!username || userData.songs.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
@@ -93,6 +104,23 @@ export default function UserPage() {
       <div className="container mx-auto px-4 py-12">
         {/* Header */}
         <div className="text-center mb-12">
+          {/* ユーザーアイコン */}
+          <div className="flex justify-center mb-6">
+            {userData.icon ? (
+              <img
+                src={userData.icon}
+                alt={`${username}のアイコン`}
+                className="w-24 h-24 rounded-full object-cover border-4 border-white/20 shadow-lg"
+              />
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center border-4 border-white/20 shadow-lg">
+                <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+              </div>
+            )}
+          </div>
+          
           <h1 className="text-5xl font-bold text-white mb-4">
             {username}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
@@ -106,7 +134,7 @@ export default function UserPage() {
 
         {/* Music Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-          {songs.map((song, idx) => (
+          {userData.songs.map((song: Song, idx: number) => (
             <div
               key={idx}
               className="group relative bg-slate-800/50 backdrop-blur-sm rounded-2xl p-4 hover:bg-slate-700/60 transition-all duration-300 hover:scale-105 hover:shadow-2xl border border-slate-700/50"

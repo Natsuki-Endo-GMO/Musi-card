@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MusicSearchAutocomplete from '../components/MusicSearchAutocomplete'
+import IconUpload from '../components/IconUpload'
 import { SearchResult } from '../services/musicSearch'
 
 interface Song {
@@ -13,6 +14,7 @@ interface Song {
 export default function CreateUser() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
+  const [userIcon, setUserIcon] = useState('')
   const [songs, setSongs] = useState<Song[]>([
     { title: '', artist: '', jacket: '' }
   ])
@@ -62,10 +64,13 @@ export default function CreateUser() {
       // 実際のアプリケーションではAPIを呼び出します
       // ここではローカルストレージに保存
       const userData = {
-        [username]: validSongs.map(song => ({
-          ...song,
-          jacket: song.jacket || `https://picsum.photos/300/300?random=${Math.floor(Math.random() * 1000)}`
-        }))
+        [username]: {
+          icon: userIcon,
+          songs: validSongs.map(song => ({
+            ...song,
+            jacket: song.jacket || `https://picsum.photos/300/300?random=${Math.floor(Math.random() * 1000)}`
+          }))
+        }
       }
 
       // 既存のデータを取得
@@ -107,6 +112,22 @@ export default function CreateUser() {
             {/* User Info */}
             <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50">
               <h2 className="text-2xl font-bold text-white mb-6">基本情報</h2>
+              
+              {/* アイコンアップロード */}
+              <div className="mb-6">
+                <label className="block text-slate-300 text-sm font-medium mb-2">
+                  プロフィールアイコン
+                </label>
+                <IconUpload
+                  onIconChange={setUserIcon}
+                  currentIcon={userIcon}
+                  className="text-white"
+                />
+                <p className="text-slate-400 text-sm mt-2">
+                  アイコンは任意です。設定しない場合はデフォルトアイコンが表示されます。
+                </p>
+              </div>
+
               <div>
                 <label htmlFor="username" className="block text-slate-300 text-sm font-medium mb-2">
                   ユーザー名 *

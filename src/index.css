@@ -1,3 +1,91 @@
 @tailwind base;
 @tailwind components;
-@tailwind utilities; 
+@tailwind utilities;
+
+/* ReactCrop カスタムスタイル */
+.crop-container {
+  position: relative;
+  display: inline-block;
+}
+
+.crop-container .ReactCrop {
+  cursor: move;
+}
+
+.crop-container .ReactCrop__crop-selection {
+  cursor: move !important;
+  border: 2px solid #3b82f6 !important;
+  border-radius: 50% !important;
+  transition: all 0.1s ease;
+}
+
+.crop-container .ReactCrop__drag-handle {
+  background: #3b82f6 !important;
+  border: 2px solid white !important;
+  border-radius: 50% !important;
+  width: 12px !important;
+  height: 12px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease;
+}
+
+.crop-container .ReactCrop__drag-handle:hover {
+  background: #2563eb !important;
+  transform: scale(1.2);
+}
+
+.crop-container .ReactCrop__drag-handle:active {
+  transform: scale(1.1);
+}
+
+/* ドラッグ中のスタイル */
+.crop-container.dragging .ReactCrop__crop-selection {
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  transform: scale(1.02);
+}
+
+.crop-container.dragging .ReactCrop__drag-handle {
+  background: #1d4ed8 !important;
+  transform: scale(1.1);
+}
+
+/* ドラッグ中のカーソル */
+.crop-container.dragging {
+  cursor: grabbing !important;
+}
+
+.crop-container.dragging .ReactCrop {
+  cursor: grabbing !important;
+}
+
+.crop-container.dragging .ReactCrop__crop-selection {
+  cursor: grabbing !important;
+}
+
+/* ドラッグ可能な領域の拡大 */
+.crop-container .ReactCrop__crop-selection::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  cursor: move;
+  z-index: 1;
+}
+
+/* タッチデバイス用の調整 */
+@media (pointer: coarse) {
+  .crop-container .ReactCrop__drag-handle {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  
+  .crop-container .ReactCrop__crop-selection::before {
+    top: -15px;
+    left: -15px;
+    right: -15px;
+    bottom: -15px;
+  }
+} 
