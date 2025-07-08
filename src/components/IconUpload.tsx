@@ -71,30 +71,32 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
     const file = event.target.files?.[0]
     if (!file) return
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('ファイルサイズは5MB以下にしてください')
+    // ファイルサイズチェック（5MB制限）
+    const maxSizeInMB = 5
+    const maxSizeInBytes = maxSizeInMB * 1024 * 1024
+    if (file.size > maxSizeInBytes) {
+      alert(`ファイルサイズは${maxSizeInMB}MB以下にしてください。現在のサイズ: ${(file.size / 1024 / 1024).toFixed(1)}MB`)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
       return
     }
 
+    // ファイルタイプチェック
     if (!file.type.startsWith('image/')) {
       alert('画像ファイルを選択してください')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
       return
     }
 
     const reader = new FileReader()
     reader.onload = (e) => {
-      setSelectedImage(e.target?.result as string)
+      const result = e.target?.result as string
+      setSelectedImage(result)
       setIsCropping(true)
-      
-      const img = new Image()
-      img.onload = () => {
-        if (isMobile) {
-          setCropArea({ x: 15, y: 15, size: 70 })
-        } else {
-          setCropArea({ x: 20, y: 20, size: 60 })
-        }
-      }
-      img.src = e.target?.result as string
+      setCropArea({ x: 25, y: 25, size: 50 }) // デフォルト位置
     }
     reader.readAsDataURL(file)
   }
@@ -267,11 +269,16 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
       const cropX = (cropArea.x / 100) * imageRef.current.width
       const cropY = (cropArea.y / 100) * imageRef.current.height
 
-      // 実際の画像での正方形サイズ
-      const actualCropSize = cropSize * Math.min(scaleX, scaleY)
+      // 最終出力サイズを合理的な範囲に制限（アイコン用途なので256px程度で十分）
+      const maxOutputSize = 256
+      const actualCropSize = Math.min(cropSize * Math.min(scaleX, scaleY), maxOutputSize)
 
       canvas.width = actualCropSize
       canvas.height = actualCropSize
+
+      // 高品質な描画設定
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
 
       ctx.drawImage(
         imageRef.current,
@@ -285,7 +292,8 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
         actualCropSize
       )
 
-      const croppedImageUrl = canvas.toDataURL('image/jpeg', 0.9)
+      // 画質を少し下げて処理速度を向上（0.85でも十分高品質）
+      const croppedImageUrl = canvas.toDataURL('image/jpeg', 0.85)
       onIconChange(croppedImageUrl)
       setSelectedImage(null)
       setIsCropping(false)
@@ -346,6 +354,16 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
     })
   }
 
+  // モーダル内でのキーダウンイベント処理
+  const handleModalKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      e.stopPropagation()
+      // トリミング確定処理を実行
+      handleCropComplete()
+    }
+  }
+
   // モーダルコンポーネント
   const Modal = () => {
     if (!isCropping || !selectedImage) return null
@@ -357,12 +375,21 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
         style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
       >
         <div 
-          className={`bg-white rounded-xl shadow-2xl p-4 ${isMobile ? 'w-full h-full max-w-none max-h-none rounded-none' : 'max-w-2xl w-full max-h-[90vh] overflow-y-auto'}`}
+          className={`bg-white rounded-xl shadow-2xl p-4 select-none ${isMobile ? 'w-full h-full max-w-none max-h-none rounded-none' : 'max-w-2xl w-full max-h-[90vh] overflow-y-auto'}`}
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={handleModalKeyDown}
+          tabIndex={0}
+          style={{
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            MozUserSelect: 'none',
+            msUserSelect: 'none'
+          }}
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-semibold text-gray-800">アイコンをトリミング</h3>
             <button
+              type="button"
               onClick={handleCancelCrop}
               className="text-gray-400 hover:text-gray-600 transition-colors p-2"
               disabled={isUploading}
@@ -418,6 +445,25 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
                 </div>
                 <div>制限値: {Math.round(debugMinSize)}px</div>
                 <br />
+                マスク情報
+                <div>
+                  {(() => {
+                    const imageSize = getCurrentImageSize()
+                    const squareSize = (cropArea.size / 100) * Math.min(imageSize.width, imageSize.height)
+                    const cropLeft = (cropArea.x / 100) * imageSize.width
+                    const cropTop = (cropArea.y / 100) * imageSize.height
+                    const centerX = ((cropLeft + squareSize / 2) / imageSize.width) * 100
+                    const centerY = ((cropTop + squareSize / 2) / imageSize.height) * 100
+                    const minImageSize = Math.min(imageSize.width, imageSize.height)
+                    const radiusX = (squareSize / 2 / imageSize.width) * 100
+                    const radiusY = (squareSize / 2 / imageSize.height) * 100
+                    const radiusPercent = Math.min(radiusX, radiusY)
+                    const maskStyle = `radial-gradient(circle ${radiusPercent}% at ${centerX}% ${centerY}%, transparent 98%, black 100%)`
+                    console.log('Mask debug:', { centerX, centerY, radiusPercent, imageSize, squareSize })
+                    return `中心: ${centerX.toFixed(1)}%, ${centerY.toFixed(1)}% | 半径: ${radiusPercent.toFixed(1)}%`
+                  })()}
+                </div>
+                <br />
                 トリミング予定範囲
                 <div>
                   {(() => {
@@ -441,10 +487,13 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
                 isResizing ? 'cursor-se-resize' : 
                 isDragging ? 'cursor-grabbing' : 
                 'cursor-move'
-              }`}
+              } select-none`}
               style={{
                 maxWidth: isMobile ? '100%' : '100%',
-                maxHeight: isMobile ? '60vh' : '24rem'
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                MozUserSelect: 'none',
+                msUserSelect: 'none'
               }}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
@@ -458,7 +507,16 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
                 ref={imageRef}
                 src={selectedImage}
                 alt="トリミング対象"
-                className="max-w-full max-h-full object-contain rounded-lg"
+                className="max-w-full max-h-full object-contain rounded-lg select-none"
+                style={{
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  MozUserSelect: 'none',
+                  msUserSelect: 'none',
+                  WebkitTouchCallout: 'none',
+                  ...({ WebkitUserDrag: 'none' } as any)
+                }}
+                draggable={false}
               />
               
               {/* トリミングエリア */}
@@ -468,44 +526,189 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
                 
                 if (imageSize.width === 0 || imageSize.height === 0) return null
                 
+                // 画像要素の実際の位置を取得
+                const imageRect = imageRef.current?.getBoundingClientRect()
+                const containerRect = containerRef.current?.getBoundingClientRect()
+                
+                console.log('=== デバッグ情報 ===')
+                console.log('画像サイズ:', imageSize)
+                console.log('画像要素の位置:', imageRect)
+                console.log('コンテナの位置:', containerRect)
+                
                 // 正方形のサイズを短辺を基準に計算
                 const squareSize = (cropArea.size / 100) * minSize
                 const cropLeft = (cropArea.x / 100) * imageSize.width
                 const cropTop = (cropArea.y / 100) * imageSize.height
                 
+                // マスク用の円形の中心座標（画像に対する相対位置）
+                const centerX = ((cropLeft + squareSize / 2) / imageSize.width) * 100
+                const centerY = ((cropTop + squareSize / 2) / imageSize.height) * 100
+                
+                // 半径は正方形の1辺を2で割った値（ピクセル）
+                const radiusPx = squareSize / 2
+                
+                // 半径を画像サイズに対するパーセンテージで計算
+                const radiusPercentX = (radiusPx / imageSize.width) * 100
+                const radiusPercentY = (radiusPx / imageSize.height) * 100
+                
+                // 正円を維持するため、X/Y両方向での半径を考慮
+                // 楕円形式で指定: ellipse 横半径% 縦半径% 
+                const radiusPercent = Math.max(radiusPercentX, radiusPercentY)
+                
+                console.log('トリミング枠:', { 
+                  cropLeft, 
+                  cropTop, 
+                  squareSize,
+                  radiusPx
+                })
+                console.log('マスク中心座標:', { centerX, centerY })
+                console.log('半径計算:', { 
+                  radiusPercentX, 
+                  radiusPercentY, 
+                  radiusPercent,
+                  '画像サイズ': imageSize
+                })
+                
+                // マスクスタイル - 楕円形式で正確な円を作成
+                const maskStyle = `radial-gradient(ellipse ${radiusPercentX}% ${radiusPercentY}% at ${centerX}% ${centerY}%, transparent 97%, black 100%)`
+                
+                console.log('マスクスタイル:', maskStyle)
+                
                 return (
-                  <div
-                    ref={cropAreaRef}
-                    className={`absolute border-2 border-blue-500 ${isDragging ? 'border-blue-700 shadow-lg' : ''}`}
-                    style={{
-                      left: `${cropLeft}px`,
-                      top: `${cropTop}px`,
-                      width: `${squareSize}px`,
-                      height: `${squareSize}px`,
-                      cursor: isResizing ? 'se-resize' : isDragging ? 'grabbing' : 'move',
-                      transition: isDragging || isResizing ? 'none' : 'all 0.1s ease',
-                      borderRadius: '50%',
-                      zIndex: 10,
-                      pointerEvents: 'auto'
-                    }}
-                    title={`正方形サイズ: ${Math.round(squareSize)}px × ${Math.round(squareSize)}px`}
-                  >
-                    {/* リサイズハンドル - 右下のみ使用 */}
-                    <div 
-                      className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-se-resize hover:bg-blue-600 transition-colors"
-                      style={{ zIndex: 15 }}
-                      onMouseDown={handleResizeStart}
-                      onTouchStart={handleResizeTouchStart}
-                      title="ドラッグしてサイズを変更"
+                  <>
+                    {/* 背景オーバーレイ（トリミング枠に追従する円形マスク） */}
+                    <div
+                      className={`absolute inset-0 bg-black bg-opacity-50 pointer-events-none ${isDragging || isResizing ? '' : 'transition-all duration-150'}`}
+                      style={{
+                        zIndex: 5,
+                        WebkitMask: maskStyle,
+                        mask: maskStyle,
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)'
+                      }}
                     />
                     
-                    {/* 移動用のドラッグエリア（中央部分） */}
-                    <div 
-                      className="absolute inset-2 cursor-move rounded-full"
-                      style={{ zIndex: 12 }}
-                      title="ドラッグして移動"
+                    {/* 代替マスク: 4つの矩形で円形を模擬（CSS maskが効かない場合の備え） */}
+                    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 4 }}>
+                      {/* 上部マスク */}
+                      <div 
+                        className="absolute bg-black bg-opacity-40"
+                        style={{
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: `${cropTop}px`
+                        }}
+                      />
+                      {/* 下部マスク */}
+                      <div 
+                        className="absolute bg-black bg-opacity-40"
+                        style={{
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: `${imageSize.height - cropTop - squareSize}px`
+                        }}
+                      />
+                      {/* 左部マスク */}
+                      <div 
+                        className="absolute bg-black bg-opacity-40"
+                        style={{
+                          top: `${cropTop}px`,
+                          left: 0,
+                          width: `${cropLeft}px`,
+                          height: `${squareSize}px`
+                        }}
+                      />
+                      {/* 右部マスク */}
+                      <div 
+                        className="absolute bg-black bg-opacity-40"
+                        style={{
+                          top: `${cropTop}px`,
+                          right: 0,
+                          width: `${imageSize.width - cropLeft - squareSize}px`,
+                          height: `${squareSize}px`
+                        }}
+                      />
+                    </div>
+                    
+                    {/* 正方形の基準枠（点線） */}
+                    <div
+                      className={`absolute border-2 border-dashed border-white pointer-events-none ${isDragging || isResizing ? '' : 'transition-all duration-150'}`}
+                      style={{
+                        left: `${cropLeft}px`,
+                        top: `${cropTop}px`,
+                        width: `${squareSize}px`,
+                        height: `${squareSize}px`,
+                        zIndex: 8,
+                        opacity: 0.8
+                      }}
                     />
-                  </div>
+                    
+                    {/* メインのトリミング枠（操作可能） */}
+                    <div
+                      ref={cropAreaRef}
+                      className={`absolute border-2 border-white ${isDragging || isResizing ? 'border-blue-400' : ''} transition-colors duration-150`}
+                      style={{
+                        left: `${cropLeft}px`,
+                        top: `${cropTop}px`,
+                        width: `${squareSize}px`,
+                        height: `${squareSize}px`,
+                        cursor: isResizing ? 'se-resize' : isDragging ? 'grabbing' : 'move',
+                        transition: isDragging || isResizing ? 'none' : 'all 0.15s ease',
+                        zIndex: 10,
+                        pointerEvents: 'auto',
+                        backgroundColor: 'transparent'
+                      }}
+                      title={`正方形サイズ: ${Math.round(squareSize)}px × ${Math.round(squareSize)}px`}
+                    >
+                      {/* グリッドライン（3x3） */}
+                      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 11 }}>
+                        {/* 縦線 */}
+                        <div className={`absolute ${isMobile ? 'border-l-2' : 'border-l'} border-white opacity-50`} style={{
+                          left: '33.333%',
+                          top: 0,
+                          height: '100%'
+                        }} />
+                        <div className={`absolute ${isMobile ? 'border-l-2' : 'border-l'} border-white opacity-50`} style={{
+                          left: '66.666%',
+                          top: 0,
+                          height: '100%'
+                        }} />
+                        {/* 横線 */}
+                        <div className={`absolute ${isMobile ? 'border-t-2' : 'border-t'} border-white opacity-50`} style={{
+                          top: '33.333%',
+                          left: 0,
+                          width: '100%'
+                        }} />
+                        <div className={`absolute ${isMobile ? 'border-t-2' : 'border-t'} border-white opacity-50`} style={{
+                          top: '66.666%',
+                          left: 0,
+                          width: '100%'
+                        }} />
+                      </div>
+                      
+                      {/* コーナーハンドル */}
+                      <div className={`absolute -top-1 -left-1 ${isMobile ? 'w-4 h-4' : 'w-3 h-3'} bg-white border border-gray-400`} style={{ zIndex: 15 }} />
+                      <div className={`absolute -top-1 -right-1 ${isMobile ? 'w-4 h-4' : 'w-3 h-3'} bg-white border border-gray-400`} style={{ zIndex: 15 }} />
+                      <div className={`absolute -bottom-1 -left-1 ${isMobile ? 'w-4 h-4' : 'w-3 h-3'} bg-white border border-gray-400`} style={{ zIndex: 15 }} />
+                      <div className={`absolute -bottom-1 -right-1 ${isMobile ? 'w-4 h-4' : 'w-3 h-3'} bg-white border border-gray-400`} style={{ zIndex: 15 }} />
+                      
+                      {/* リサイズハンドル（右下、より目立つデザイン） */}
+                      <div 
+                        className={`absolute -bottom-2 -right-2 ${isMobile ? 'w-6 h-6' : 'w-5 h-5'} bg-blue-500 border-2 border-white rounded cursor-se-resize hover:bg-blue-600 transition-colors shadow-lg`}
+                        style={{ zIndex: 16 }}
+                        onMouseDown={handleResizeStart}
+                        onTouchStart={handleResizeTouchStart}
+                        title="ドラッグしてサイズを変更"
+                      />
+                      
+                      {/* 円形プレビューライン */}
+                      <div 
+                        className="absolute inset-0 border-2 border-blue-400 rounded-full pointer-events-none opacity-75"
+                        style={{ zIndex: 12 }}
+                      />
+                    </div>
+                  </>
                 )
               })()}
             </div>
@@ -513,6 +716,7 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
 
           <div className="flex justify-end space-x-3 relative z-20">
             <button
+              type="button"
               onClick={handleCancelCrop}
               className="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
               disabled={isUploading}
@@ -520,6 +724,7 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
               キャンセル
             </button>
             <button
+              type="button"
               onClick={handleCropComplete}
               className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 font-medium"
               disabled={isUploading}
@@ -545,6 +750,7 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
               className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
             />
             <button
+              type="button"
               onClick={handleRemoveIcon}
               className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm hover:bg-red-600 transition-colors"
             >
@@ -554,6 +760,7 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
           <div>
             <p className="text-sm text-gray-600">アイコンが設定されています</p>
             <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
               className="text-sm text-blue-500 hover:text-blue-600"
             >
@@ -574,6 +781,7 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
             className="hidden"
           />
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             className="flex flex-col items-center space-y-2 text-gray-600 hover:text-blue-500"
           >

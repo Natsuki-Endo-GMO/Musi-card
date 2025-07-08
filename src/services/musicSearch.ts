@@ -1,8 +1,27 @@
 import axios from 'axios'
+import { spotifySearch, SpotifyTrack, SpotifyAlbum } from './spotifyApi'
+
+// 音楽API プロバイダー設定
+export type MusicProvider = 'lastfm' | 'spotify'
+
+// 設定可能なAPI プロバイダー（デフォルトはSpotify）
+let currentProvider: MusicProvider = 'spotify'
+
+// プロバイダー切り替え関数
+export const setMusicProvider = (provider: MusicProvider) => {
+  currentProvider = provider
+  console.log(`音楽検索プロバイダーを ${provider} に切り替えました`)
+}
+
+export const getCurrentProvider = (): MusicProvider => currentProvider
 
 // Last.fm API設定
 const LASTFM_API_KEY = import.meta.env.VITE_LASTFM_API_KEY || 'YOUR_LASTFM_API_KEY'
 const LASTFM_BASE_URL = 'https://ws.audioscrobbler.com/2.0/'
+
+// Spotify API設定
+const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID
+const hasSpotifyConfig = Boolean(SPOTIFY_CLIENT_ID)
 
 export interface SearchResult {
   name: string
@@ -10,6 +29,8 @@ export interface SearchResult {
   image?: string
   url?: string
   isGeneratedImage?: boolean
+  provider?: MusicProvider
+  id?: string // Spotify用
 }
 
 export interface AlbumSearchResult {
@@ -18,6 +39,8 @@ export interface AlbumSearchResult {
   image: string
   url: string
   isGeneratedImage?: boolean
+  provider?: MusicProvider
+  id?: string // Spotify用
 }
 
 // 画像URLが有効かどうかをチェックする関数
@@ -25,8 +48,66 @@ const isValidImageUrl = (url: string): boolean => {
   return Boolean(url && url.trim() !== '' && !url.includes('2a96cbd8b46e442fc41c2b86b821562f'))
 }
 
-// Last.fm APIを使用した音楽検索
-export const searchMusic = async (query: string): Promise<SearchResult[]> => {
+// Spotify アクセストークン管理
+let spotifyAccessToken: string | null = null
+
+export const setSpotifyAccessToken = (token: string) => {
+  spotifyAccessToken = token
+  console.log('Spotify アクセストークンが設定されました')
+}
+
+export const getSpotifyAccessToken = (): string | null => spotifyAccessToken
+
+// Spotify検索関数
+const searchMusicSpotify = async (query: string): Promise<SearchResult[]> => {
+  if (!spotifyAccessToken) {
+    console.warn('Spotify アクセストークンが設定されていません。Last.fmにフォールバックします。')
+    return searchMusicLastFm(query)
+  }
+
+  try {
+    // まずアルバム検索を試行
+    const albums = await spotifySearch.searchAlbums(query, spotifyAccessToken, 5)
+    const tracks = await spotifySearch.searchTracks(query, spotifyAccessToken, 5)
+
+    const results: SearchResult[] = []
+
+    // アルバム結果を追加
+    albums.forEach((album: SpotifyAlbum) => {
+      results.push({
+        name: album.name,
+        artist: album.artist,
+        image: album.image || undefined,
+        url: album.spotifyUrl,
+        isGeneratedImage: !album.image,
+        provider: 'spotify',
+        id: album.id
+      })
+    })
+
+    // トラック結果を追加
+    tracks.forEach((track: SpotifyTrack) => {
+      results.push({
+        name: track.name,
+        artist: track.artist,
+        image: track.image || undefined,
+        url: track.spotifyUrl,
+        isGeneratedImage: !track.image,
+        provider: 'spotify',
+        id: track.id
+      })
+    })
+
+    return results.slice(0, 10) // 最大10件に制限
+  } catch (error) {
+    console.error('Spotify検索エラー:', error)
+    console.log('Last.fmにフォールバックします')
+    return searchMusicLastFm(query)
+  }
+}
+
+// Last.fm APIを使用した音楽検索（元のsearchMusic関数を改名）
+const searchMusicLastFm = async (query: string): Promise<SearchResult[]> => {
   try {
     const response = await axios.get(LASTFM_BASE_URL, {
       params: {
@@ -48,7 +129,8 @@ export const searchMusic = async (query: string): Promise<SearchResult[]> => {
         artist: track.artist,
         image: isValidImageUrl(imageUrl) ? imageUrl : fallback.image,
         url: track.url,
-        isGeneratedImage: !isValidImageUrl(imageUrl)
+        isGeneratedImage: !isValidImageUrl(imageUrl),
+        provider: 'lastfm'
       }
     })
   } catch (error) {
@@ -81,7 +163,8 @@ export const searchAlbum = async (query: string): Promise<AlbumSearchResult[]> =
         artist: album.artist,
         image: isValidImageUrl(imageUrl) ? imageUrl : fallback.image,
         url: album.url,
-        isGeneratedImage: !isValidImageUrl(imageUrl)
+        isGeneratedImage: !isValidImageUrl(imageUrl),
+        provider: 'lastfm'
       }
     })
   } catch (error) {
@@ -102,16 +185,16 @@ const getFallbackImage = (trackName: string, artistName: string): { image: strin
 
 // モックデータ（APIキーがない場合のフォールバック）
 const mockSearchResults: SearchResult[] = [
-  { name: 'Bohemian Rhapsody', artist: 'Queen', image: 'https://picsum.photos/300/300?random=1', isGeneratedImage: true },
-  { name: 'Hotel California', artist: 'Eagles', image: 'https://picsum.photos/300/300?random=2', isGeneratedImage: true },
-  { name: 'Imagine', artist: 'John Lennon', image: 'https://picsum.photos/300/300?random=3', isGeneratedImage: true },
-  { name: 'Stairway to Heaven', artist: 'Led Zeppelin', image: 'https://picsum.photos/300/300?random=4', isGeneratedImage: true },
-  { name: 'Yesterday', artist: 'The Beatles', image: 'https://picsum.photos/300/300?random=5', isGeneratedImage: true },
-  { name: 'Smells Like Teen Spirit', artist: 'Nirvana', image: 'https://picsum.photos/300/300?random=6', isGeneratedImage: true },
-  { name: 'Like a Rolling Stone', artist: 'Bob Dylan', image: 'https://picsum.photos/300/300?random=7', isGeneratedImage: true },
-  { name: 'I Want to Hold Your Hand', artist: 'The Beatles', image: 'https://picsum.photos/300/300?random=8', isGeneratedImage: true },
-  { name: 'Johnny B. Goode', artist: 'Chuck Berry', image: 'https://picsum.photos/300/300?random=9', isGeneratedImage: true },
-  { name: 'Good Vibrations', artist: 'The Beach Boys', image: 'https://picsum.photos/300/300?random=10', isGeneratedImage: true }
+  { name: 'Bohemian Rhapsody', artist: 'Queen', image: 'https://picsum.photos/300/300?random=1', isGeneratedImage: true, provider: 'lastfm' },
+  { name: 'Hotel California', artist: 'Eagles', image: 'https://picsum.photos/300/300?random=2', isGeneratedImage: true, provider: 'lastfm' },
+  { name: 'Imagine', artist: 'John Lennon', image: 'https://picsum.photos/300/300?random=3', isGeneratedImage: true, provider: 'lastfm' },
+  { name: 'Stairway to Heaven', artist: 'Led Zeppelin', image: 'https://picsum.photos/300/300?random=4', isGeneratedImage: true, provider: 'lastfm' },
+  { name: 'Yesterday', artist: 'The Beatles', image: 'https://picsum.photos/300/300?random=5', isGeneratedImage: true, provider: 'lastfm' },
+  { name: 'Smells Like Teen Spirit', artist: 'Nirvana', image: 'https://picsum.photos/300/300?random=6', isGeneratedImage: true, provider: 'lastfm' },
+  { name: 'Like a Rolling Stone', artist: 'Bob Dylan', image: 'https://picsum.photos/300/300?random=7', isGeneratedImage: true, provider: 'lastfm' },
+  { name: 'I Want to Hold Your Hand', artist: 'The Beatles', image: 'https://picsum.photos/300/300?random=8', isGeneratedImage: true, provider: 'lastfm' },
+  { name: 'Johnny B. Goode', artist: 'Chuck Berry', image: 'https://picsum.photos/300/300?random=9', isGeneratedImage: true, provider: 'lastfm' },
+  { name: 'Good Vibrations', artist: 'The Beach Boys', image: 'https://picsum.photos/300/300?random=10', isGeneratedImage: true, provider: 'lastfm' }
 ]
 
 // モック検索（実際のAPIキーがない場合）
@@ -145,7 +228,7 @@ export const searchMusicWithAlbumPriority = async (query: string): Promise<Searc
       }
       
       // アルバムが見つからない場合は楽曲検索
-      const trackResults = await searchMusic(query)
+      const trackResults = await searchMusicLastFm(query)
       return trackResults
     } catch (error) {
       // eslint-disable-next-line no-console -- APIエラー時のデバッグ用

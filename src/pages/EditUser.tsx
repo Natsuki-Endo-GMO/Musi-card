@@ -86,6 +86,14 @@ export default function EditUser() {
       return
     }
 
+    // ジャケット画像URLの形式チェック（入力されている場合のみ）
+    for (const song of validSongs) {
+      if (song.jacket.trim() && !isValidUrl(song.jacket.trim())) {
+        alert(`「${song.title}」のジャケット画像URLが正しい形式ではありません。\n例: https://example.com/image.jpg`)
+        return
+      }
+    }
+
     try {
       const storedData = localStorage.getItem('musicmeisi_users')
       const users = storedData ? JSON.parse(storedData) : {}
@@ -101,6 +109,16 @@ export default function EditUser() {
       navigate(`/users/${username}`)
     } catch (error) {
       alert('エラーが発生しました。もう一度お試しください。')
+    }
+  }
+
+  // URLの形式をチェックするヘルパー関数
+  const isValidUrl = (string: string): boolean => {
+    try {
+      new URL(string)
+      return true
+    } catch (_) {
+      return false
     }
   }
 
@@ -134,7 +152,7 @@ export default function EditUser() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
-          <form onSubmit={handleSubmit} className="space-y-8">
+          <form onSubmit={handleSubmit} className="space-y-8" noValidate>
             {/* User Info */}
             <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50">
               <h2 className="text-2xl font-bold text-white mb-6">基本情報</h2>
@@ -212,7 +230,6 @@ export default function EditUser() {
                             onChange={(e) => updateSong(index, 'title', e.target.value)}
                             className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                             placeholder="曲名を入力"
-                            required
                           />
                         </div>
                         <div>
@@ -225,7 +242,6 @@ export default function EditUser() {
                             onChange={(e) => updateSong(index, 'artist', e.target.value)}
                             className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                             placeholder="アーティスト名を入力"
-                            required
                           />
                         </div>
                       </div>
@@ -236,7 +252,7 @@ export default function EditUser() {
                         ジャケット画像URL（任意）
                       </label>
                       <input
-                        type="url"
+                        type="text"
                         value={song.jacket}
                         onChange={(e) => updateSong(index, 'jacket', e.target.value)}
                         className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"

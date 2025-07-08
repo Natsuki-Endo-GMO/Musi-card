@@ -60,6 +60,14 @@ export default function CreateUser() {
       return
     }
 
+    // ジャケット画像URLの形式チェック（入力されている場合のみ）
+    for (const song of validSongs) {
+      if (song.jacket.trim() && !isValidUrl(song.jacket.trim())) {
+        alert(`「${song.title}」のジャケット画像URLが正しい形式ではありません。\n例: https://example.com/image.jpg`)
+        return
+      }
+    }
+
     try {
       // 実際のアプリケーションではAPIを呼び出します
       // ここではローカルストレージに保存
@@ -86,6 +94,16 @@ export default function CreateUser() {
     }
   }
 
+  // URLの形式をチェックするヘルパー関数
+  const isValidUrl = (string: string): boolean => {
+    try {
+      new URL(string)
+      return true
+    } catch (_) {
+      return false
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Navigation */}
@@ -108,7 +126,7 @@ export default function CreateUser() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
-          <form onSubmit={handleSubmit} className="space-y-8">
+          <form onSubmit={handleSubmit} className="space-y-8" noValidate>
             {/* User Info */}
             <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50">
               <h2 className="text-2xl font-bold text-white mb-6">基本情報</h2>
@@ -139,7 +157,6 @@ export default function CreateUser() {
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   placeholder="あなたのユーザー名"
-                  required
                 />
                 <p className="text-slate-400 text-sm mt-2">
                   この名前で名刺ページが作成されます: /users/{username || 'yourname'}
@@ -205,7 +222,6 @@ export default function CreateUser() {
                             onChange={(e) => updateSong(index, 'title', e.target.value)}
                             className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                             placeholder="曲名を入力"
-                            required
                           />
                         </div>
                         <div>
@@ -218,7 +234,6 @@ export default function CreateUser() {
                             onChange={(e) => updateSong(index, 'artist', e.target.value)}
                             className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                             placeholder="アーティスト名を入力"
-                            required
                           />
                         </div>
                       </div>
@@ -229,7 +244,7 @@ export default function CreateUser() {
                         ジャケット画像URL（任意）
                       </label>
                       <input
-                        type="url"
+                        type="text"
                         value={song.jacket}
                         onChange={(e) => updateSong(index, 'jacket', e.target.value)}
                         className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
