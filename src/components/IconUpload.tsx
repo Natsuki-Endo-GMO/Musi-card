@@ -1,7 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import ReactCrop, { Crop, PixelCrop } from 'react-image-crop'
-import 'react-image-crop/dist/ReactCrop.css'
 
 interface IconUploadProps {
   onIconChange: (iconUrl: string) => void
@@ -9,23 +7,24 @@ interface IconUploadProps {
   className?: string
 }
 
+interface CropArea {
+  x: number
+  y: number
+  size: number
+}
+
 export default function IconUpload({ onIconChange, currentIcon, className = '' }: IconUploadProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
-  const [crop, setCrop] = useState<Crop>({
-    unit: '%',
-    width: 60,
-    height: 60,
-    x: 20,
-    y: 20
-  })
-  const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
+  const [cropArea, setCropArea] = useState<CropArea>({ x: 20, y: 20, size: 60 })
   const [isCropping, setIsCropping] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
-  const cropRef = useRef<any>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const cropAreaRef = useRef<HTMLDivElement>(null)
 
   // モバイル判定
   useEffect(() => {
@@ -39,6 +38,13 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // 画像の現在の表示サイズを取得
+  const getCurrentImageSize = () => {
+    if (!imageRef.current) return { width: 0, height: 0 }
+    const rect = imageRef.current.getBoundingClientRect()
+    return { width: rect.width, height: rect.height }
+  }
+
   // ESCキーでのキャンセル機能
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
@@ -49,7 +55,6 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
 
     if (isCropping) {
       document.addEventListener('keydown', handleEscKey)
-      // スクロールを無効化
       document.body.style.overflow = 'hidden'
     }
 
@@ -64,13 +69,11 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
     const file = event.target.files?.[0]
     if (!file) return
 
-    // ファイルサイズチェック（5MB以下）
     if (file.size > 5 * 1024 * 1024) {
       alert('ファイルサイズは5MB以下にしてください')
       return
     }
 
-    // 画像ファイルかチェック
     if (!file.type.startsWith('image/')) {
       alert('画像ファイルを選択してください')
       return
@@ -81,29 +84,12 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
       setSelectedImage(e.target?.result as string)
       setIsCropping(true)
       
-      // 画像の縦横比に応じて初期配置を調整
       const img = new Image()
       img.onload = () => {
-        const aspectRatio = img.width / img.height
-        
         if (isMobile) {
-          // モバイルの場合
-          setCrop({
-            unit: '%',
-            width: 70,
-            height: 70,
-            x: 15,
-            y: 15
-          })
+          setCropArea({ x: 15, y: 15, size: 70 })
         } else {
-          // デスクトップの場合
-          setCrop({
-            unit: '%',
-            width: 60,
-            height: 60,
-            x: 20,
-            y: 20
-          })
+          setCropArea({ x: 20, y: 20, size: 60 })
         }
       }
       img.src = e.target?.result as string
@@ -111,9 +97,98 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
     reader.readAsDataURL(file)
   }
 
+  // マウスダウン処理
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!containerRef.current || !imageRef.current) return
+    
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const imageRect = imageRef.current.getBoundingClientRect()
+    
+    // 画像の表示サイズを基準にした座標計算
+    const imageX = ((e.clientX - imageRect.left) / imageRect.width) * 100
+    const imageY = ((e.clientY - imageRect.top) / imageRect.height) * 100
+    
+    // クリック位置がトリミングエリア内かチェック
+    if (imageX >= cropArea.x && imageX <= cropArea.x + cropArea.size &&
+        imageY >= cropArea.y && imageY <= cropArea.y + cropArea.size) {
+      setIsDragging(true)
+      setDragStart({ x: imageX - cropArea.x, y: imageY - cropArea.y })
+    }
+  }
+
+  // マウス移動処理
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !imageRef.current) return
+    
+    const imageRect = imageRef.current.getBoundingClientRect()
+    const imageX = ((e.clientX - imageRect.left) / imageRect.width) * 100
+    const imageY = ((e.clientY - imageRect.top) / imageRect.height) * 100
+    
+    // 正方形サイズを考慮した境界チェック
+    const imageSize = getCurrentImageSize()
+    const minSize = Math.min(imageSize.width, imageSize.height)
+    const squareSizePercent = (cropArea.size / 100) * minSize
+    const maxXPercent = ((imageSize.width - squareSizePercent) / imageSize.width) * 100
+    const maxYPercent = ((imageSize.height - squareSizePercent) / imageSize.height) * 100
+    
+    const newX = Math.max(0, Math.min(maxXPercent, imageX - dragStart.x))
+    const newY = Math.max(0, Math.min(maxYPercent, imageY - dragStart.y))
+    
+    setCropArea(prev => ({ ...prev, x: newX, y: newY }))
+  }
+
+  // マウスアップ処理
+  const handleMouseUp = () => {
+    setIsDragging(false)
+  }
+
+  // タッチ開始処理
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!containerRef.current || !imageRef.current) return
+    
+    const touch = e.touches[0]
+    const imageRect = imageRef.current.getBoundingClientRect()
+    const imageX = ((touch.clientX - imageRect.left) / imageRect.width) * 100
+    const imageY = ((touch.clientY - imageRect.top) / imageRect.height) * 100
+    
+    if (imageX >= cropArea.x && imageX <= cropArea.x + cropArea.size &&
+        imageY >= cropArea.y && imageY <= cropArea.y + cropArea.size) {
+      setIsDragging(true)
+      setDragStart({ x: imageX - cropArea.x, y: imageY - cropArea.y })
+    }
+  }
+
+  // タッチ移動処理
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || !imageRef.current) return
+    
+    e.preventDefault()
+    const touch = e.touches[0]
+    const imageRect = imageRef.current.getBoundingClientRect()
+    const imageX = ((touch.clientX - imageRect.left) / imageRect.width) * 100
+    const imageY = ((touch.clientY - imageRect.top) / imageRect.height) * 100
+    
+    // 正方形サイズを考慮した境界チェック
+    const imageSize = getCurrentImageSize()
+    const minSize = Math.min(imageSize.width, imageSize.height)
+    const squareSizePercent = (cropArea.size / 100) * minSize
+    const maxXPercent = ((imageSize.width - squareSizePercent) / imageSize.width) * 100
+    const maxYPercent = ((imageSize.height - squareSizePercent) / imageSize.height) * 100
+    
+    const newX = Math.max(0, Math.min(maxXPercent, imageX - dragStart.x))
+    const newY = Math.max(0, Math.min(maxYPercent, imageY - dragStart.y))
+    
+    setCropArea(prev => ({ ...prev, x: newX, y: newY }))
+  }
+
+  // タッチ終了処理
+  const handleTouchEnd = () => {
+    setIsDragging(false)
+  }
+
   // トリミング実行
   const handleCropComplete = async () => {
-    if (!completedCrop || !imageRef.current) return
+    if (!imageRef.current) return
 
     setIsUploading(true)
     try {
@@ -124,25 +199,26 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
       const scaleX = imageRef.current.naturalWidth / imageRef.current.width
       const scaleY = imageRef.current.naturalHeight / imageRef.current.height
 
-      canvas.width = completedCrop.width
-      canvas.height = completedCrop.height
+      const cropSize = (cropArea.size / 100) * imageRef.current.width
+      const cropX = (cropArea.x / 100) * imageRef.current.width
+      const cropY = (cropArea.y / 100) * imageRef.current.height
+
+      canvas.width = cropSize
+      canvas.height = cropSize
 
       ctx.drawImage(
         imageRef.current,
-        completedCrop.x * scaleX,
-        completedCrop.y * scaleY,
-        completedCrop.width * scaleX,
-        completedCrop.height * scaleY,
+        cropX * scaleX,
+        cropY * scaleY,
+        cropSize * scaleX,
+        cropSize * scaleY,
         0,
         0,
-        completedCrop.width,
-        completedCrop.height
+        cropSize,
+        cropSize
       )
 
-      // トリミングされた画像をBase64で取得
       const croppedImageUrl = canvas.toDataURL('image/jpeg', 0.9)
-      
-      // アイコンとして設定
       onIconChange(croppedImageUrl)
       setSelectedImage(null)
       setIsCropping(false)
@@ -178,16 +254,6 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
     }
   }
 
-  // ドラッグ開始
-  const handleDragStart = () => {
-    setIsDragging(true)
-  }
-
-  // ドラッグ終了
-  const handleDragEnd = () => {
-    setIsDragging(false)
-  }
-
   // モーダルコンポーネント
   const Modal = () => {
     if (!isCropping || !selectedImage) return null
@@ -214,39 +280,129 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
               </svg>
             </button>
           </div>
+
+          {/* デバッグ情報パネル */}
+          {(() => {
+            const imageSize = getCurrentImageSize()
+            const naturalSize = imageRef.current ? {
+              width: imageRef.current.naturalWidth,
+              height: imageRef.current.naturalHeight
+            } : { width: 0, height: 0 }
+            
+            const debugImageSize = getCurrentImageSize()
+            const debugMinSize = Math.min(debugImageSize.width, debugImageSize.height)
+
+            return (
+              <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white p-2 text-xs rounded z-20">
+                画像情報
+                <div>元解像度: {naturalSize.width} × {naturalSize.height}</div>
+                <div>表示サイズ: {debugImageSize.width} × {debugImageSize.height}</div>
+                <div>元縦横比: {(naturalSize.width / naturalSize.height).toFixed(2)}</div>
+                <div>表示縦横比: {(debugImageSize.width / debugImageSize.height).toFixed(2)}</div>
+                <div>短辺/長辺: {Math.min(naturalSize.width, naturalSize.height)} / {Math.max(naturalSize.width, naturalSize.height)}</div>
+                <br />
+                トリミング枠情報
+                <div>位置: {cropArea.x.toFixed(1)}%, {cropArea.y.toFixed(1)}%</div>
+                <div>サイズ: {cropArea.size}%</div>
+                <div>
+                  {(() => {
+                    const squareSize = (cropArea.size / 100) * debugMinSize
+                    return `正方形サイズ: ${Math.round(squareSize)}px × ${Math.round(squareSize)}px`
+                  })()}
+                </div>
+                <div>
+                  実際幅: {cropAreaRef.current ? cropAreaRef.current.offsetWidth : 0}px
+                </div>
+                <div>
+                  実際高: {cropAreaRef.current ? cropAreaRef.current.offsetHeight : 0}px
+                </div>
+                <div>
+                  実際縦横比: {cropAreaRef.current ? 
+                    (cropAreaRef.current.offsetWidth / cropAreaRef.current.offsetHeight).toFixed(2) : 
+                    'N/A'
+                  }
+                </div>
+                <div>制限値: {Math.round(debugMinSize)}px</div>
+              </div>
+            )
+          })()}
           
           <div className={`mb-6 ${isMobile ? 'flex-1 flex items-center justify-center' : ''}`}>
-            <div className={`crop-container ${isDragging ? 'dragging' : ''}`}>
-              <ReactCrop
-                ref={cropRef}
-                crop={crop}
-                onChange={(c) => setCrop(c)}
-                onComplete={(c) => setCompletedCrop(c)}
-                aspect={1}
-                circularCrop
-                className="max-w-full"
-                minWidth={50}
-                minHeight={50}
-                keepSelection
-                ruleOfThirds
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-              >
-                <img
-                  ref={imageRef}
-                  src={selectedImage}
-                  alt="トリミング対象"
-                  className={`${isMobile ? 'max-h-[60vh] max-w-full' : 'max-w-full max-h-96'} object-contain rounded-lg`}
-                  style={{ 
-                    maxWidth: isMobile ? '100%' : '100%',
-                    maxHeight: isMobile ? '60vh' : '24rem'
-                  }}
-                />
-              </ReactCrop>
+            <div 
+              ref={containerRef}
+              className={`relative inline-block ${isDragging ? 'cursor-grabbing' : 'cursor-move'}`}
+              style={{
+                maxWidth: isMobile ? '100%' : '100%',
+                maxHeight: isMobile ? '60vh' : '24rem'
+              }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              <img
+                ref={imageRef}
+                src={selectedImage}
+                alt="トリミング対象"
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+              
+              {/* トリミングエリア */}
+              {(() => {
+                const imageSize = getCurrentImageSize()
+                const minSize = Math.min(imageSize.width, imageSize.height)
+                
+                if (imageSize.width === 0 || imageSize.height === 0) return null
+                
+                // 正方形のサイズを短辺を基準に計算
+                const squareSize = (cropArea.size / 100) * minSize
+                const cropLeft = (cropArea.x / 100) * imageSize.width
+                const cropTop = (cropArea.y / 100) * imageSize.height
+                
+                return (
+                  <div
+                    ref={cropAreaRef}
+                    className={`absolute border-2 border-blue-500 ${isDragging ? 'border-blue-700 shadow-lg' : ''}`}
+                    style={{
+                      left: `${cropLeft}px`,
+                      top: `${cropTop}px`,
+                      width: `${squareSize}px`,
+                      height: `${squareSize}px`,
+                      cursor: isDragging ? 'grabbing' : 'move',
+                      transition: isDragging ? 'none' : 'all 0.1s ease',
+                      borderRadius: '50%',
+                      zIndex: 10,
+                      pointerEvents: 'auto'
+                    }}
+                    title={`正方形サイズ: ${Math.round(squareSize)}px × ${Math.round(squareSize)}px`}
+                  >
+                    {/* ドラッグハンドル */}
+                    <div 
+                      className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"
+                      style={{ zIndex: 15 }}
+                    />
+                    <div 
+                      className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"
+                      style={{ zIndex: 15 }}
+                    />
+                    <div 
+                      className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"
+                      style={{ zIndex: 15 }}
+                    />
+                    <div 
+                      className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"
+                      style={{ zIndex: 15 }}
+                    />
+                  </div>
+                )
+              })()}
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3">
+          <div className="flex justify-end space-x-3 relative z-20">
             <button
               onClick={handleCancelCrop}
               className="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
@@ -257,7 +413,7 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
             <button
               onClick={handleCropComplete}
               className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 font-medium"
-              disabled={isUploading || !completedCrop}
+              disabled={isUploading}
             >
               {isUploading ? '処理中...' : '適用'}
             </button>
