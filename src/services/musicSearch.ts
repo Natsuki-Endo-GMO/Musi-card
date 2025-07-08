@@ -51,12 +51,36 @@ const isValidImageUrl = (url: string): boolean => {
 // Spotify アクセストークン管理
 let spotifyAccessToken: string | null = null
 
+// アプリケーション初期化時にローカルストレージからトークンを復元
+const initializeSpotifyToken = () => {
+  const savedToken = localStorage.getItem('spotify_access_token')
+  if (savedToken) {
+    spotifyAccessToken = savedToken
+    console.log('Spotify トークンをローカルストレージから復元しました')
+    
+    // Spotifyが利用可能な場合はデフォルトプロバイダーに設定
+    if (hasSpotifyConfig) {
+      setMusicProvider('spotify')
+    }
+  }
+}
+
+// 初期化を実行
+initializeSpotifyToken()
+
 export const setSpotifyAccessToken = (token: string) => {
   spotifyAccessToken = token
+  localStorage.setItem('spotify_access_token', token)
   console.log('Spotify アクセストークンが設定されました')
 }
 
 export const getSpotifyAccessToken = (): string | null => spotifyAccessToken
+
+export const removeSpotifyAccessToken = () => {
+  spotifyAccessToken = null
+  localStorage.removeItem('spotify_access_token')
+  console.log('Spotify アクセストークンを削除しました')
+}
 
 // Spotify検索関数
 const searchMusicSpotify = async (query: string): Promise<SearchResult[]> => {
@@ -142,36 +166,41 @@ const searchMusicLastFm = async (query: string): Promise<SearchResult[]> => {
 
 // アルバム検索
 export const searchAlbum = async (query: string): Promise<AlbumSearchResult[]> => {
-  try {
-    const response = await axios.get(LASTFM_BASE_URL, {
-      params: {
-        method: 'album.search',
-        album: query,
-        api_key: LASTFM_API_KEY,
-        format: 'json',
-        limit: 10
+  const availableProviders = getAvailableProviders()
+  
+  // 現在のプロバイダーが利用可能かチェック
+  if (availableProviders.includes(currentProvider)) {
+    try {
+      switch (currentProvider) {
+        case 'spotify':
+          return await searchAlbumSpotify(query)
+        case 'lastfm':
+          return await searchAlbumLastFm(query)
+        default:
+          throw new Error(`未サポートのプロバイダー: ${currentProvider}`)
       }
-    })
-
-    const albums = response.data.results?.albummatches?.album || []
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Last.fm APIのレスポンス型が不定のため
-    return albums.map((album: any) => {
-      const imageUrl = album.image?.[3]?.['#text'] || album.image?.[2]?.['#text'] || album.image?.[1]?.['#text'] || ''
-      const fallback = getFallbackImage(album.name, album.artist)
-      return {
-        name: album.name,
-        artist: album.artist,
-        image: isValidImageUrl(imageUrl) ? imageUrl : fallback.image,
-        url: album.url,
-        isGeneratedImage: !isValidImageUrl(imageUrl),
-        provider: 'lastfm'
-      }
-    })
-  } catch (error) {
-    // eslint-disable-next-line no-console -- APIエラー時のデバッグ用
-    console.error('アルバム検索エラー:', error)
-    return []
+    } catch (error) {
+      console.error(`${currentProvider}アルバム検索エラー:`, error)
+    }
   }
+  
+  // フォールバック
+  for (const provider of availableProviders) {
+    if (provider !== currentProvider) {
+      try {
+        switch (provider) {
+          case 'spotify':
+            return await searchAlbumSpotify(query)
+          case 'lastfm':
+            return await searchAlbumLastFm(query)
+        }
+      } catch (error) {
+        console.error(`${provider}アルバム検索フォールバック失敗:`, error)
+      }
+    }
+  }
+  
+  return []
 }
 
 // 画像の代替手段を提供する関数
@@ -217,25 +246,134 @@ const hasValidApiKey = () => {
   return LASTFM_API_KEY && LASTFM_API_KEY !== 'YOUR_LASTFM_API_KEY'
 }
 
+// プロバイダーの利用可能性をチェック
+export const getAvailableProviders = (): MusicProvider[] => {
+  const providers: MusicProvider[] = []
+  
+  if (hasSpotifyConfig && spotifyAccessToken) {
+    providers.push('spotify')
+  }
+  
+  if (hasValidApiKey()) {
+    providers.push('lastfm')
+  }
+  
+  return providers
+}
+
+// 統合音楽検索（プロバイダーに基づく）
+export const searchMusic = async (query: string): Promise<SearchResult[]> => {
+  const availableProviders = getAvailableProviders()
+  
+  // 現在のプロバイダーが利用可能かチェック
+  if (availableProviders.includes(currentProvider)) {
+    try {
+      switch (currentProvider) {
+        case 'spotify':
+          return await searchMusicSpotify(query)
+        case 'lastfm':
+          return await searchMusicLastFm(query)
+        default:
+          throw new Error(`未サポートのプロバイダー: ${currentProvider}`)
+      }
+    } catch (error) {
+      console.error(`${currentProvider}検索エラー:`, error)
+    }
+  }
+  
+  // フォールバック: 利用可能な他のプロバイダーを試行
+  for (const provider of availableProviders) {
+    if (provider !== currentProvider) {
+      try {
+        console.log(`${provider}にフォールバックします`)
+        switch (provider) {
+          case 'spotify':
+            return await searchMusicSpotify(query)
+          case 'lastfm':
+            return await searchMusicLastFm(query)
+        }
+      } catch (error) {
+        console.error(`${provider}フォールバック失敗:`, error)
+      }
+    }
+  }
+  
+  // 全てのプロバイダーが失敗した場合はモックデータ
+  console.log('全てのプロバイダーが利用不可。モックデータを使用します。')
+  return await searchMusicMock(query)
+}
+
+// Spotify用のアルバム検索
+const searchAlbumSpotify = async (query: string): Promise<AlbumSearchResult[]> => {
+  if (!spotifyAccessToken) {
+    return searchAlbumLastFm(query)
+  }
+
+  try {
+    const albums = await spotifySearch.searchAlbums(query, spotifyAccessToken, 10)
+    return albums.map((album: SpotifyAlbum) => ({
+      name: album.name,
+      artist: album.artist,
+      image: album.image || getFallbackImage(album.name, album.artist).image,
+      url: album.spotifyUrl,
+      isGeneratedImage: !album.image,
+      provider: 'spotify',
+      id: album.id
+    }))
+  } catch (error) {
+    console.error('Spotifyアルバム検索エラー:', error)
+    return searchAlbumLastFm(query)
+  }
+}
+
+// Last.fm用のアルバム検索（元のsearchAlbum関数を改名）
+const searchAlbumLastFm = async (query: string): Promise<AlbumSearchResult[]> => {
+  try {
+    const response = await axios.get(LASTFM_BASE_URL, {
+      params: {
+        method: 'album.search',
+        album: query,
+        api_key: LASTFM_API_KEY,
+        format: 'json',
+        limit: 10
+      }
+    })
+
+    const albums = response.data.results?.albummatches?.album || []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Last.fm APIのレスポンス型が不定のため
+    return albums.map((album: any) => {
+      const imageUrl = album.image?.[3]?.['#text'] || album.image?.[2]?.['#text'] || album.image?.[1]?.['#text'] || ''
+      const fallback = getFallbackImage(album.name, album.artist)
+      return {
+        name: album.name,
+        artist: album.artist,
+        image: isValidImageUrl(imageUrl) ? imageUrl : fallback.image,
+        url: album.url,
+        isGeneratedImage: !isValidImageUrl(imageUrl),
+        provider: 'lastfm'
+      }
+    })
+  } catch (error) {
+    // eslint-disable-next-line no-console -- APIエラー時のデバッグ用
+    console.error('アルバム検索エラー:', error)
+    return []
+  }
+}
+
 // アルバム検索を優先した統合検索
 export const searchMusicWithAlbumPriority = async (query: string): Promise<SearchResult[]> => {
-  if (hasValidApiKey()) {
-    try {
-      // まずアルバム検索を試行
-      const albumResults = await searchAlbum(query)
-      if (albumResults.length > 0) {
-        return albumResults
-      }
-      
-      // アルバムが見つからない場合は楽曲検索
-      const trackResults = await searchMusicLastFm(query)
-      return trackResults
-    } catch (error) {
-      // eslint-disable-next-line no-console -- APIエラー時のデバッグ用
-      console.error('統合検索エラー:', error)
-      return await searchMusicMock(query)
+  try {
+    // まずアルバム検索を試行
+    const albumResults = await searchAlbum(query)
+    if (albumResults.length > 0) {
+      return albumResults
     }
-  } else {
+    
+    // アルバムが見つからない場合は楽曲検索
+    const trackResults = await searchMusic(query)
+    return trackResults
+  } catch (error) {
+    console.error('統合検索エラー:', error)
     return await searchMusicMock(query)
   }
 }

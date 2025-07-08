@@ -1,224 +1,251 @@
-import { useState, useEffect, useRef } from 'react'
-import { spotifySearch, SpotifyAlbum, SpotifyTrack, SpotifyArtist } from '../services/spotifyApi'
+import React, { useState, useEffect } from 'react'
+import { 
+  searchMusicWithFallback, 
+  SearchResult,
+  setMusicProvider,
+  getCurrentProvider,
+  getAvailableProviders,
+  setSpotifyAccessToken,
+  getSpotifyAccessToken,
+  MusicProvider
+} from '../services/musicSearch'
+import { spotifyAuth } from '../services/spotifyApi'
 
 interface SpotifySearchAutocompleteProps {
-  onSelect: (item: SpotifyAlbum | SpotifyTrack | SpotifyArtist) => void
-  searchType?: 'album' | 'track' | 'artist'
-  placeholder?: string
+  onSelect: (track: SearchResult) => void
   className?: string
+  placeholder?: string
+  disabled?: boolean
 }
 
 export default function SpotifySearchAutocomplete({
   onSelect,
-  searchType = 'album',
-  placeholder = 'アルバムを検索...',
-  className = ''
+  className = '',
+  placeholder = '音楽やアルバムを検索...',
+  disabled = false
 }: SpotifySearchAutocompleteProps) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<(SpotifyAlbum | SpotifyTrack | SpotifyArtist)[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [isOpen, setIsOpen] = useState(false)
-  const [selectedIndex, setSelectedIndex] = useState(-1)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showResults, setShowResults] = useState(false)
+  const [currentProvider, setCurrentProviderState] = useState<MusicProvider>('spotify')
+  const [isSpotifyAuthenticated, setIsSpotifyAuthenticated] = useState(false)
+  const [availableProviders, setAvailableProviders] = useState<MusicProvider[]>([])
 
-  // Spotifyアクセストークンを取得
-  const getSpotifyToken = () => {
-    return localStorage.getItem('spotify_access_token')
-  }
-
-  // 検索実行
-  const performSearch = async (searchQuery: string) => {
-    if (!searchQuery.trim()) {
-      setResults([])
-      return
-    }
-
-    const token = getSpotifyToken()
-    if (!token) {
-      console.warn('Spotifyアクセストークンが見つかりません')
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      let searchResults: (SpotifyAlbum | SpotifyTrack | SpotifyArtist)[] = []
-
-      switch (searchType) {
-        case 'album':
-          searchResults = await spotifySearch.searchAlbums(searchQuery, token, 8)
-          break
-        case 'track':
-          searchResults = await spotifySearch.searchTracks(searchQuery, token, 8)
-          break
-        case 'artist':
-          searchResults = await spotifySearch.searchArtists(searchQuery, token, 8)
-          break
-      }
-
-      setResults(searchResults)
-      setIsOpen(true)
-    } catch (error) {
-      console.error('Spotify検索エラー:', error)
-      setResults([])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // デバウンス処理
+  // 初期化時の処理
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (query) {
-        performSearch(query)
-      } else {
-        setResults([])
-        setIsOpen(false)
-      }
-    }, 300)
-
-    return () => clearTimeout(timeoutId)
-  }, [query, searchType])
-
-  // キーボードナビゲーション
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!isOpen) return
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault()
-        setSelectedIndex(prev => 
-          prev < results.length - 1 ? prev + 1 : prev
-        )
-        break
-      case 'ArrowUp':
-        e.preventDefault()
-        setSelectedIndex(prev => prev > 0 ? prev - 1 : -1)
-        break
-      case 'Enter':
-        e.preventDefault()
-        if (selectedIndex >= 0 && results[selectedIndex]) {
-          handleSelect(results[selectedIndex])
-        }
-        break
-      case 'Escape':
-        setIsOpen(false)
-        setSelectedIndex(-1)
-        break
-    }
-  }
-
-  // アイテム選択
-  const handleSelect = (item: SpotifyAlbum | SpotifyTrack | SpotifyArtist) => {
-    onSelect(item)
-    setQuery('')
-    setResults([])
-    setIsOpen(false)
-    setSelectedIndex(-1)
-    inputRef.current?.blur()
-  }
-
-  // ドロップダウン外クリックで閉じる
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false)
-        setSelectedIndex(-1)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    updateProviderState()
+    checkSpotifyAuth()
   }, [])
 
-  // アイテム表示用のレンダリング関数
-  const renderItem = (item: SpotifyAlbum | SpotifyTrack | SpotifyArtist, index: number) => {
-    const isSelected = index === selectedIndex
-    const baseClasses = "flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors"
-    const selectedClasses = isSelected ? "bg-blue-50 border-blue-200" : ""
+  const updateProviderState = () => {
+    const providers = getAvailableProviders()
+    setAvailableProviders(providers)
+    setCurrentProviderState(getCurrentProvider())
+  }
 
-    return (
-      <div
-        key={item.id}
-        className={`${baseClasses} ${selectedClasses}`}
-        onClick={() => handleSelect(item)}
-        onMouseEnter={() => setSelectedIndex(index)}
-      >
-        <div className="flex-shrink-0 w-12 h-12 mr-3">
-          {item.image ? (
-            <img
-              src={item.image}
-              alt={item.name}
-              className="w-full h-full object-cover rounded-lg"
-            />
-          ) : (
-            <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.894A1 1 0 0018 16V3z" clipRule="evenodd" />
-              </svg>
-            </div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-gray-900 truncate">
-            {item.name}
-          </div>
-          <div className="text-sm text-gray-500 truncate">
-            {searchType === 'album' && (item as SpotifyAlbum).artist}
-            {searchType === 'track' && `${(item as SpotifyTrack).artist} • ${(item as SpotifyTrack).album}`}
-            {searchType === 'artist' && `${(item as SpotifyArtist).followers.toLocaleString()} followers`}
-          </div>
-        </div>
-        <div className="flex-shrink-0 ml-2">
-          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-          </svg>
-        </div>
-      </div>
+  const checkSpotifyAuth = () => {
+    const token = getSpotifyAccessToken()
+    setIsSpotifyAuthenticated(Boolean(token))
+  }
+
+  // Spotify認証を開始
+  const handleSpotifyAuth = () => {
+    const authUrl = spotifyAuth.getAuthUrl()
+    const popup = window.open(
+      authUrl,
+      'spotify-auth',
+      'width=500,height=600,scrollbars=yes,resizable=yes'
     )
+
+    // ポップアップからのメッセージを待機
+    const checkClosed = setInterval(() => {
+      if (popup?.closed) {
+        clearInterval(checkClosed)
+        // 認証完了後の処理（トークンがセットされているかチェック）
+        setTimeout(() => {
+          checkSpotifyAuth()
+          updateProviderState()
+        }, 1000)
+      }
+    }, 1000)
+  }
+
+  // プロバイダー切り替え
+  const handleProviderChange = (provider: MusicProvider) => {
+    setMusicProvider(provider)
+    setCurrentProviderState(provider)
+    
+    // 既に検索結果がある場合は再検索
+    if (query.trim()) {
+      searchMusic()
+    }
+  }
+
+  const searchMusic = async () => {
+    if (!query.trim()) {
+      setResults([])
+      setShowResults(false)
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const searchResults = await searchMusicWithFallback(query)
+      setResults(searchResults)
+      setShowResults(searchResults.length > 0)
+    } catch (error) {
+      console.error('検索エラー:', error)
+      setResults([])
+      setShowResults(false)
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  useEffect(() => {
+    const timeoutId = setTimeout(searchMusic, 300)
+    return () => clearTimeout(timeoutId)
+  }, [query])
+
+  const handleSelect = (track: SearchResult) => {
+    onSelect(track)
+    setQuery('')
+    setResults([])
+    setShowResults(false)
+  }
+
+  const handleInputBlur = () => {
+    setTimeout(() => setShowResults(false), 150)
+  }
+
+  const getProviderDisplayName = (provider: MusicProvider) => {
+    switch (provider) {
+      case 'spotify': return 'Spotify'
+      case 'lastfm': return 'Last.fm'
+      default: return provider
+    }
+  }
+
+  const getProviderBadgeColor = (provider: MusicProvider) => {
+    switch (provider) {
+      case 'spotify': return 'bg-green-500'
+      case 'lastfm': return 'bg-red-500'
+      default: return 'bg-gray-500'
+    }
   }
 
   return (
     <div className={`relative ${className}`}>
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={() => {
-            if (results.length > 0) setIsOpen(true)
-          }}
-          placeholder={placeholder}
-          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-        />
-        {isLoading && (
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-          </div>
+      {/* プロバイダー選択とSpotify認証 */}
+      <div className="mb-3 flex items-center gap-2 flex-wrap">
+        <span className="text-sm text-gray-600">音楽検索:</span>
+        
+        {/* プロバイダー切り替えボタン */}
+        {availableProviders.map((provider) => (
+          <button
+            key={provider}
+            onClick={() => handleProviderChange(provider)}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              currentProvider === provider
+                ? `${getProviderBadgeColor(provider)} text-white`
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            {getProviderDisplayName(provider)}
+          </button>
+        ))}
+
+        {/* Spotify認証ボタン */}
+        {!isSpotifyAuthenticated && (
+          <button
+            onClick={handleSpotifyAuth}
+            className="px-3 py-1 bg-green-500 text-white rounded-full text-xs font-medium hover:bg-green-600 transition-colors"
+          >
+            Spotify認証
+          </button>
+        )}
+
+        {/* 認証状態表示 */}
+        {isSpotifyAuthenticated && (
+          <span className="text-xs text-green-600 flex items-center gap-1">
+            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+            Spotify認証済み
+          </span>
         )}
       </div>
 
-      {isOpen && results.length > 0 && (
-        <div
-          ref={dropdownRef}
-          className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-80 overflow-y-auto"
-        >
-          {results.map((item, index) => renderItem(item, index))}
-        </div>
-      )}
+      {/* 検索入力 */}
+      <div className="relative">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => results.length > 0 && setShowResults(true)}
+          onBlur={handleInputBlur}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+        />
+        
+        {isSearching && (
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+          </div>
+        )}
 
-      {isOpen && results.length === 0 && !isLoading && query && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-4">
-          <p className="text-gray-500 text-center">検索結果が見つかりませんでした</p>
-        </div>
-      )}
+        {/* 検索結果 */}
+        {showResults && results.length > 0 && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+            {results.map((track, index) => (
+              <button
+                key={index}
+                onClick={() => handleSelect(track)}
+                className="w-full p-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="flex-shrink-0">
+                    {track.image ? (
+                      <img
+                        src={track.image}
+                        alt={`${track.name} by ${track.artist}`}
+                        className="w-12 h-12 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
+                        <span className="text-gray-400 text-xs">No Image</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {track.name}
+                    </p>
+                    <p className="text-sm text-gray-500 truncate">
+                      {track.artist}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`px-2 py-0.5 rounded-full text-xs text-white ${getProviderBadgeColor(track.provider || 'lastfm')}`}>
+                        {getProviderDisplayName(track.provider || 'lastfm')}
+                      </span>
+                      {track.isGeneratedImage && (
+                        <span className="text-xs text-orange-500">生成画像</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* 検索結果なし */}
+        {showResults && results.length === 0 && !isSearching && query.trim() && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-center text-gray-500">
+            「{query}」の検索結果が見つかりませんでした
+          </div>
+        )}
+      </div>
     </div>
   )
 } 
