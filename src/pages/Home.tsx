@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { startSpotifyAuth, generateSpotifyAuthUrl } from '../services/musicSearch'
 
 export default function Home() {
   return (
@@ -80,6 +81,47 @@ export default function Home() {
             </div>
             <h3 className="text-gray-900 font-semibold text-lg mb-2">どこでも表示</h3>
             <p className="text-gray-600 text-sm leading-relaxed">PC・スマートフォンどちらでも美しく表示</p>
+          </div>
+        </div>
+
+        {/* 音楽検索機能説明 */}
+        <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 border border-blue-200/50 shadow-lg">
+          <h2 className="text-2xl font-bold text-blue-900 mb-4">🎵 音楽検索機能</h2>
+          <p className="text-blue-700 mb-4">
+            SpotifyとLast.fmの両方に対応した音楽検索で、豊富な楽曲データベースから選択できます。
+          </p>
+          
+          {/* Spotify認証ボタン */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-blue-900 mb-1">🎧 Spotify認証</h3>
+                <p className="text-blue-600 text-sm">
+                  Spotifyにログインして、より豊富な音楽データベースにアクセス
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const authUrl = generateSpotifyAuthUrl()
+                  window.open(authUrl, '_blank')
+                }}
+                className="bg-green-500 text-white px-4 py-2 rounded-xl font-semibold hover:bg-green-600 transition-colors duration-300 flex items-center gap-2"
+              >
+                <span>🎵</span>
+                Spotify連携
+              </button>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <h3 className="font-semibold text-blue-900 mb-2">🎯 Spotify検索</h3>
+              <p className="text-blue-600 text-sm">高精度な検索結果と豊富なメタデータ</p>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <h3 className="font-semibold text-blue-900 mb-2">🔄 Last.fmフォールバック</h3>
+              <p className="text-blue-600 text-sm">Spotifyで見つからない場合の自動フォールバック</p>
+            </div>
           </div>
         </div>
       </div>

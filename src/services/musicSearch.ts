@@ -60,8 +60,9 @@ const LASTFM_API_KEY = import.meta.env.VITE_LASTFM_API_KEY || 'YOUR_LASTFM_API_K
 const LASTFM_BASE_URL = 'https://ws.audioscrobbler.com/2.0/'
 
 // Spotify API設定
-const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID
-const hasSpotifyConfig = Boolean(SPOTIFY_CLIENT_ID)
+const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID || ''
+const REDIRECT_URI = `${window.location.origin}/callback`
+const SCOPES = 'user-read-private user-read-email'
 
 export interface SearchResult {
   name: string
@@ -99,7 +100,7 @@ const initializeSpotifyToken = () => {
     console.log('Spotify トークンをローカルストレージから復元しました')
     
     // Spotifyが利用可能な場合はデフォルトプロバイダーに設定
-    if (hasSpotifyConfig) {
+    if (Boolean(SPOTIFY_CLIENT_ID)) {
       setMusicProvider('spotify')
     }
   }
@@ -119,21 +120,146 @@ export const getSpotifyAccessToken = (): string | null => spotifyAccessToken
 export const removeSpotifyAccessToken = () => {
   spotifyAccessToken = null
   localStorage.removeItem('spotify_access_token')
+  localStorage.removeItem('spotify_refresh_token')
+  localStorage.removeItem('spotify_token_expires')
   console.log('Spotify アクセストークンを削除しました')
+}
+
+/**
+ * 認証コードからアクセストークンを取得（Authorization Code Flow）
+ */
+export async function exchangeCodeForTokens(code: string, state: string): Promise<{
+  access_token: string
+  refresh_token: string
+  expires_in: number
+}> {
+  // CSRF攻撃防止
+  const storedState = sessionStorage.getItem('spotify_auth_state')
+  if (state !== storedState) {
+    throw new Error('Invalid state parameter')
+  }
+  
+  const redirectUri = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:5173/callback'
+  
+  const response = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${import.meta.env.VITE_SPOTIFY_CLIENT_SECRET || ''}`)}`
+    },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: code,
+      redirect_uri: redirectUri
+    })
+  })
+  
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(`Token exchange failed: ${errorData.error_description || errorData.error}`)
+  }
+  
+  const tokenData = await response.json()
+  
+  // トークンを保存
+  setSpotifyAccessToken(tokenData.access_token)
+  localStorage.setItem('spotify_refresh_token', tokenData.refresh_token)
+  localStorage.setItem('spotify_token_expires', (Date.now() + tokenData.expires_in * 1000).toString())
+  
+  console.log('✅ Spotifyトークンを正常に取得・保存しました')
+  
+  return tokenData
+}
+
+/**
+ * リフレッシュトークンを使用してアクセストークンを更新
+ */
+export async function refreshSpotifyToken(): Promise<string> {
+  const refreshToken = localStorage.getItem('spotify_refresh_token')
+  if (!refreshToken) {
+    throw new Error('リフレッシュトークンがありません')
+  }
+  
+  const response = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${import.meta.env.VITE_SPOTIFY_CLIENT_SECRET || ''}`)}`
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken
+    })
+  })
+  
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(`Token refresh failed: ${errorData.error_description || errorData.error}`)
+  }
+  
+  const tokenData = await response.json()
+  
+  // 新しいトークンを保存
+  setSpotifyAccessToken(tokenData.access_token)
+  localStorage.setItem('spotify_token_expires', (Date.now() + tokenData.expires_in * 1000).toString())
+  
+  // リフレッシュトークンが更新された場合は保存
+  if (tokenData.refresh_token) {
+    localStorage.setItem('spotify_refresh_token', tokenData.refresh_token)
+  }
+  
+  console.log('✅ Spotifyトークンをリフレッシュしました')
+  
+  return tokenData.access_token
+}
+
+/**
+ * トークンの有効期限をチェックし、必要に応じて更新
+ */
+export async function ensureValidToken(): Promise<string | null> {
+  if (!spotifyAccessToken) {
+    console.log('❌ アクセストークンが設定されていません')
+    return null
+  }
+  
+  const expiresAt = localStorage.getItem('spotify_token_expires')
+  if (!expiresAt) {
+    console.log('❌ トークンの有効期限情報がありません')
+    return spotifyAccessToken
+  }
+  
+  const now = Date.now()
+  const expireTime = parseInt(expiresAt)
+  
+  // 5分前にリフレッシュ（安全マージン）
+  if (now >= expireTime - 5 * 60 * 1000) {
+    console.log('🔄 トークンの有効期限が近いため、リフレッシュします')
+    try {
+      return await refreshSpotifyToken()
+    } catch (error) {
+      console.error('❌ トークンリフレッシュに失敗:', error)
+      removeSpotifyAccessToken()
+      return null
+    }
+  }
+  
+  return spotifyAccessToken
 }
 
 // Spotify検索関数
 const searchMusicSpotify = async (query: string): Promise<SearchResult[]> => {
   clearSearchStatus() // 新しい検索開始時にクリア
   
-  if (!spotifyAccessToken) {
-    const reason = 'Spotify アクセストークンが設定されていません'
+  if (!Boolean(SPOTIFY_CLIENT_ID)) {
+    const reason = 'Spotify設定（CLIENT_ID）が不完全です'
     recordSearchStatus('spotify', false, reason, `${reason}。Last.fmにフォールバックします。`)
     return searchMusicLastFm(query)
   }
 
-  if (!hasSpotifyConfig) {
-    const reason = 'Spotify設定（CLIENT_ID）が不完全です'
+  // トークンの有効性を確認し、必要に応じてリフレッシュ
+  const validToken = await ensureValidToken()
+  if (!validToken) {
+    const reason = 'Spotify アクセストークンが設定されていないか、リフレッシュに失敗しました'
     recordSearchStatus('spotify', false, reason, `${reason}。Last.fmにフォールバックします。`)
     return searchMusicLastFm(query)
   }
@@ -146,10 +272,10 @@ const searchMusicSpotify = async (query: string): Promise<SearchResult[]> => {
     const hasMultipleWords = queryParts.length >= 2
     
     // 1. まず通常の楽曲検索を実行
-    const tracks = await spotifySearch.searchTracks(query, spotifyAccessToken, 7)
+    const tracks = await spotifySearch.searchTracks(query, validToken, 7)
     
     // 2. アルバム検索も並行実行
-    const albums = await spotifySearch.searchAlbums(query, spotifyAccessToken, 3)
+    const albums = await spotifySearch.searchAlbums(query, validToken, 3)
     
     // 3. 複数単語の場合は詳細検索も試行
     let advancedTracks: any[] = []
@@ -159,7 +285,7 @@ const searchMusicSpotify = async (query: string): Promise<SearchResult[]> => {
         const trackPart = queryParts.slice(0, Math.ceil(queryParts.length / 2)).join(' ')
         const artistPart = queryParts.slice(Math.ceil(queryParts.length / 2)).join(' ')
         
-        advancedTracks = await spotifySearch.searchTracksAdvanced(trackPart, artistPart, spotifyAccessToken, 3)
+        advancedTracks = await spotifySearch.searchTracksAdvanced(trackPart, artistPart, validToken, 3)
       } catch (error) {
         console.log('Spotify詳細検索失敗（通常の検索結果を使用）:', error)
       }
@@ -379,7 +505,7 @@ const hasValidApiKey = () => {
 export const getAvailableProviders = (): MusicProvider[] => {
   const providers: MusicProvider[] = []
   
-  if (hasSpotifyConfig && spotifyAccessToken) {
+  if (Boolean(SPOTIFY_CLIENT_ID) && spotifyAccessToken) {
     providers.push('spotify')
   }
   
@@ -522,4 +648,83 @@ export const searchMusicWithAlbumPriority = async (query: string): Promise<Searc
 // メインの検索関数（後方互換性のため残す）
 export const searchMusicWithFallback = async (query: string): Promise<SearchResult[]> => {
   return await searchMusicWithAlbumPriority(query)
+}
+
+export interface SpotifyAuthConfig {
+  clientId: string
+  redirectUri: string
+  scopes: string
+}
+
+/**
+ * Spotify認証URLを生成（Authorization Code Flow）
+ */
+export function generateSpotifyAuthUrl(): string {
+  // 127.0.0.1のループバックアドレスを使用（HTTPでもSpotify登録可能）
+  const redirectUri = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:5173/callback'
+  const scopes = 'user-read-private user-read-email user-top-read'
+  const state = Math.random().toString(36).substring(2, 15) // CSRF保護用
+  
+  const params = new URLSearchParams({
+    response_type: 'code', // Authorization Code Flowに変更
+    client_id: SPOTIFY_CLIENT_ID,
+    scope: scopes,
+    redirect_uri: redirectUri,
+    show_dialog: 'true',
+    state: state
+  })
+  
+  // CSRFトークンを保存
+  sessionStorage.setItem('spotify_auth_state', state)
+  
+  return `https://accounts.spotify.com/authorize?${params.toString()}`
+}
+
+/**
+ * Spotify認証を開始（ポップアップまたはリダイレクト）
+ */
+export function startSpotifyAuth(usePopup = false): Promise<string> | void {
+  const authUrl = generateSpotifyAuthUrl()
+  
+  if (usePopup) {
+    return new Promise((resolve, reject) => {
+      const popup = window.open(
+        authUrl,
+        'spotifyAuth',
+        'width=600,height=700,scrollbars=yes,resizable=yes'
+      )
+      
+      if (!popup) {
+        reject(new Error('ポップアップがブロックされました'))
+        return
+      }
+      
+      // メッセージリスナー
+      const messageListener = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return
+        
+        if (event.data.type === 'SPOTIFY_AUTH_SUCCESS') {
+          window.removeEventListener('message', messageListener)
+          resolve(event.data.token)
+        } else if (event.data.type === 'SPOTIFY_AUTH_ERROR') {
+          window.removeEventListener('message', messageListener)
+          reject(new Error(event.data.error))
+        }
+      }
+      
+      window.addEventListener('message', messageListener)
+      
+      // ポップアップが閉じられた場合の処理
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed)
+          window.removeEventListener('message', messageListener)
+          reject(new Error('認証がキャンセルされました'))
+        }
+      }, 1000)
+    })
+  } else {
+    // 通常のリダイレクト
+    window.location.href = authUrl
+  }
 } 
