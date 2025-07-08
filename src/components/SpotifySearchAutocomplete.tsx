@@ -31,6 +31,7 @@ export default function SpotifySearchAutocomplete({
   const [currentProvider, setCurrentProviderState] = useState<MusicProvider>('spotify')
   const [isSpotifyAuthenticated, setIsSpotifyAuthenticated] = useState(false)
   const [availableProviders, setAvailableProviders] = useState<MusicProvider[]>([])
+  const [lastSearchInfo, setLastSearchInfo] = useState<string>('')
 
   // 初期化時の処理
   useEffect(() => {
@@ -42,6 +43,11 @@ export default function SpotifySearchAutocomplete({
     const providers = getAvailableProviders()
     setAvailableProviders(providers)
     setCurrentProviderState(getCurrentProvider())
+    
+    const providerStatus = providers.length > 0 
+      ? `利用可能: ${providers.map(p => p === 'spotify' ? 'Spotify' : 'Last.fm').join(', ')}`
+      : '利用可能なプロバイダーなし'
+    setLastSearchInfo(providerStatus)
   }
 
   const checkSpotifyAuth = () => {
@@ -86,18 +92,42 @@ export default function SpotifySearchAutocomplete({
     if (!query.trim()) {
       setResults([])
       setShowResults(false)
+      setLastSearchInfo('検索クエリが空です')
       return
     }
 
     setIsSearching(true)
+    const searchStartTime = Date.now()
+    
     try {
+      setLastSearchInfo(`${getCurrentProvider()}で検索中: "${query.trim()}"`)
+      
       const searchResults = await searchMusicWithFallback(query)
+      const searchDuration = Date.now() - searchStartTime
+      
       setResults(searchResults)
       setShowResults(searchResults.length > 0)
+      
+      // 検索結果の分析
+      const providerCounts = searchResults.reduce((acc, result) => {
+        acc[result.provider || 'unknown'] = (acc[result.provider || 'unknown'] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+      
+      const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(query)
+      const providerInfo = Object.entries(providerCounts)
+        .map(([provider, count]) => `${provider}:${count}件`)
+        .join(', ')
+      
+      setLastSearchInfo(
+        `検索完了 (${searchDuration}ms) | ${searchResults.length}件 | ${providerInfo}${hasJapanese ? ' | 日本語検索' : ''}`
+      )
+      
     } catch (error) {
       console.error('検索エラー:', error)
       setResults([])
       setShowResults(false)
+      setLastSearchInfo(`検索エラー: ${error instanceof Error ? error.message : '不明なエラー'}`)
     } finally {
       setIsSearching(false)
     }
@@ -171,6 +201,13 @@ export default function SpotifySearchAutocomplete({
           <span className="text-xs text-green-600 flex items-center gap-1">
             <span className="w-2 h-2 bg-green-500 rounded-full"></span>
             Spotify認証済み
+          </span>
+        )}
+        
+        {/* 検索情報表示 */}
+        {lastSearchInfo && (
+          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+            {lastSearchInfo}
           </span>
         )}
       </div>

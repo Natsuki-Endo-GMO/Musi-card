@@ -55,10 +55,45 @@ export const spotifyAuth = {
 
 // 音楽検索機能
 export const spotifySearch = {
+  // 検索クエリを最適化する関数
+  buildOptimizedQuery: (query: string, searchType: 'track' | 'album' | 'artist' = 'track'): string => {
+    // 基本的なクリーンアップ
+    let cleanQuery = query.trim()
+    
+    // 日本語検索の最適化
+    // 全角文字を含む場合は、より柔軟な検索にする
+    const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(cleanQuery)
+    
+    if (hasJapanese) {
+      // 日本語の場合、市場を日本に指定し、シンプルなクエリにする
+      return cleanQuery
+    }
+    
+    // 英語の場合、より具体的な検索フィールドを指定
+    if (searchType === 'track') {
+      // スペースが含まれている場合、曲名とアーティストの組み合わせとして扱う
+      if (cleanQuery.includes(' ') && !cleanQuery.includes('track:') && !cleanQuery.includes('artist:')) {
+        const parts = cleanQuery.split(' ')
+        if (parts.length >= 2) {
+          // 最初の部分を曲名、残りをアーティストとして扱う可能性を考慮
+          return cleanQuery // Spotifyの自動判定に任せる
+        }
+      }
+    }
+    
+    return cleanQuery
+  },
+
   // アルバム検索
   searchAlbums: async (query: string, token: string, limit: number = 10) => {
+    const optimizedQuery = spotifySearch.buildOptimizedQuery(query, 'album')
+    const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(query)
+    
+    // 日本語検索の場合は市場を日本に指定
+    const marketParam = hasJapanese ? '&market=JP' : ''
+    
     const response = await fetch(
-      `${SPOTIFY_API_BASE}/search?q=${encodeURIComponent(query)}&type=album&limit=${limit}`,
+      `${SPOTIFY_API_BASE}/search?q=${encodeURIComponent(optimizedQuery)}&type=album&limit=${limit}${marketParam}`,
       {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -67,7 +102,8 @@ export const spotifySearch = {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to search albums');
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(`Failed to search albums: ${response.status} ${errorData.error?.message || ''}`)
     }
 
     const data = await response.json();
@@ -82,10 +118,16 @@ export const spotifySearch = {
     }));
   },
 
-  // トラック検索
+  // トラック検索（強化版）
   searchTracks: async (query: string, token: string, limit: number = 10) => {
+    const optimizedQuery = spotifySearch.buildOptimizedQuery(query, 'track')
+    const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(query)
+    
+    // 日本語検索の場合は市場を日本に指定
+    const marketParam = hasJapanese ? '&market=JP' : ''
+    
     const response = await fetch(
-      `${SPOTIFY_API_BASE}/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`,
+      `${SPOTIFY_API_BASE}/search?q=${encodeURIComponent(optimizedQuery)}&type=track&limit=${limit}${marketParam}`,
       {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -94,7 +136,44 @@ export const spotifySearch = {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to search tracks');
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(`Failed to search tracks: ${response.status} ${errorData.error?.message || ''}`)
+    }
+
+    const data = await response.json();
+    return data.tracks.items.map((track: any) => ({
+      id: track.id,
+      name: track.name,
+      artist: track.artists[0]?.name || 'Unknown Artist',
+      album: track.album?.name || 'Unknown Album',
+      image: track.album?.images[0]?.url || null,
+      duration: track.duration_ms,
+      previewUrl: track.preview_url,
+      spotifyUrl: track.external_urls.spotify
+    }));
+  },
+
+  // 複合検索（曲名 + アーティスト名での詳細検索）
+  searchTracksAdvanced: async (trackName: string, artistName: string, token: string, limit: number = 5) => {
+    const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(trackName + artistName)
+    const marketParam = hasJapanese ? '&market=JP' : ''
+    
+    // より具体的なクエリを構築
+    const query = `track:"${trackName}" artist:"${artistName}"`
+    
+    const response = await fetch(
+      `${SPOTIFY_API_BASE}/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}${marketParam}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+
+    if (!response.ok) {
+      // フォールバック: クォートなしで再試行
+      const fallbackQuery = `${trackName} ${artistName}`
+      return spotifySearch.searchTracks(fallbackQuery, token, limit)
     }
 
     const data = await response.json();

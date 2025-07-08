@@ -4,13 +4,53 @@ import { spotifySearch, SpotifyTrack, SpotifyAlbum } from './spotifyApi'
 // 音楽API プロバイダー設定
 export type MusicProvider = 'lastfm' | 'spotify'
 
+// 検索状態とエラー情報を管理
+interface SearchStatus {
+  provider: MusicProvider
+  success: boolean
+  error?: string
+  fallbackReason?: string
+  timestamp: number
+}
+
+let lastSearchStatus: SearchStatus[] = []
+
+// フォールバック理由とエラー情報を取得する関数
+export const getLastSearchStatus = (): SearchStatus[] => lastSearchStatus
+
+export const clearSearchStatus = () => {
+  lastSearchStatus = []
+}
+
+// ステータス記録関数
+const recordSearchStatus = (provider: MusicProvider, success: boolean, error?: string, fallbackReason?: string) => {
+  const status: SearchStatus = {
+    provider,
+    success,
+    error,
+    fallbackReason,
+    timestamp: Date.now()
+  }
+  lastSearchStatus.push(status)
+  
+  // コンソールに詳細情報を出力
+  if (success) {
+    console.log(`✅ ${provider.toUpperCase()}検索成功`)
+  } else {
+    console.error(`❌ ${provider.toUpperCase()}検索失敗:`, error)
+    if (fallbackReason) {
+      console.warn(`🔄 フォールバック理由: ${fallbackReason}`)
+    }
+  }
+}
+
 // 設定可能なAPI プロバイダー（デフォルトはSpotify）
 let currentProvider: MusicProvider = 'spotify'
 
 // プロバイダー切り替え関数
 export const setMusicProvider = (provider: MusicProvider) => {
   currentProvider = provider
-  console.log(`音楽検索プロバイダーを ${provider} に切り替えました`)
+  console.log(`🔄 音楽検索プロバイダーを ${provider.toUpperCase()} に切り替えました`)
 }
 
 export const getCurrentProvider = (): MusicProvider => currentProvider
@@ -84,48 +124,115 @@ export const removeSpotifyAccessToken = () => {
 
 // Spotify検索関数
 const searchMusicSpotify = async (query: string): Promise<SearchResult[]> => {
+  clearSearchStatus() // 新しい検索開始時にクリア
+  
   if (!spotifyAccessToken) {
-    console.warn('Spotify アクセストークンが設定されていません。Last.fmにフォールバックします。')
+    const reason = 'Spotify アクセストークンが設定されていません'
+    recordSearchStatus('spotify', false, reason, `${reason}。Last.fmにフォールバックします。`)
+    return searchMusicLastFm(query)
+  }
+
+  if (!hasSpotifyConfig) {
+    const reason = 'Spotify設定（CLIENT_ID）が不完全です'
+    recordSearchStatus('spotify', false, reason, `${reason}。Last.fmにフォールバックします。`)
     return searchMusicLastFm(query)
   }
 
   try {
-    // まずアルバム検索を試行
-    const albums = await spotifySearch.searchAlbums(query, spotifyAccessToken, 5)
-    const tracks = await spotifySearch.searchTracks(query, spotifyAccessToken, 5)
-
     const results: SearchResult[] = []
+    
+    // クエリを分析（曲名 + アーティスト名の組み合わせかどうか）
+    const queryParts = query.trim().split(/\s+/)
+    const hasMultipleWords = queryParts.length >= 2
+    
+    // 1. まず通常の楽曲検索を実行
+    const tracks = await spotifySearch.searchTracks(query, spotifyAccessToken, 7)
+    
+    // 2. アルバム検索も並行実行
+    const albums = await spotifySearch.searchAlbums(query, spotifyAccessToken, 3)
+    
+    // 3. 複数単語の場合は詳細検索も試行
+    let advancedTracks: any[] = []
+    if (hasMultipleWords && queryParts.length <= 4) {
+      try {
+        // 前半を曲名、後半をアーティスト名として詳細検索
+        const trackPart = queryParts.slice(0, Math.ceil(queryParts.length / 2)).join(' ')
+        const artistPart = queryParts.slice(Math.ceil(queryParts.length / 2)).join(' ')
+        
+        advancedTracks = await spotifySearch.searchTracksAdvanced(trackPart, artistPart, spotifyAccessToken, 3)
+      } catch (error) {
+        console.log('Spotify詳細検索失敗（通常の検索結果を使用）:', error)
+      }
+    }
+
+    // 結果をマージ（重複を避けるためIDで管理）
+    const addedIds = new Set<string>()
+    
+    // 詳細検索結果を優先して追加
+    advancedTracks.forEach((track: SpotifyTrack) => {
+      if (!addedIds.has(track.id)) {
+        results.push({
+          name: track.name,
+          artist: track.artist,
+          image: track.image || undefined,
+          url: track.spotifyUrl,
+          isGeneratedImage: !track.image,
+          provider: 'spotify',
+          id: track.id
+        })
+        addedIds.add(track.id)
+      }
+    })
+
+    // 通常の楽曲検索結果を追加
+    tracks.forEach((track: SpotifyTrack) => {
+      if (!addedIds.has(track.id)) {
+        results.push({
+          name: track.name,
+          artist: track.artist,
+          image: track.image || undefined,
+          url: track.spotifyUrl,
+          isGeneratedImage: !track.image,
+          provider: 'spotify',
+          id: track.id
+        })
+        addedIds.add(track.id)
+      }
+    })
 
     // アルバム結果を追加
     albums.forEach((album: SpotifyAlbum) => {
-      results.push({
-        name: album.name,
-        artist: album.artist,
-        image: album.image || undefined,
-        url: album.spotifyUrl,
-        isGeneratedImage: !album.image,
-        provider: 'spotify',
-        id: album.id
-      })
+      if (!addedIds.has(album.id)) {
+        results.push({
+          name: album.name,
+          artist: album.artist,
+          image: album.image || undefined,
+          url: album.spotifyUrl,
+          isGeneratedImage: !album.image,
+          provider: 'spotify',
+          id: album.id
+        })
+        addedIds.add(album.id)
+      }
     })
 
-    // トラック結果を追加
-    tracks.forEach((track: SpotifyTrack) => {
-      results.push({
-        name: track.name,
-        artist: track.artist,
-        image: track.image || undefined,
-        url: track.spotifyUrl,
-        isGeneratedImage: !track.image,
-        provider: 'spotify',
-        id: track.id
-      })
-    })
-
+    recordSearchStatus('spotify', true)
+    console.log(`Spotify検索完了: ${results.length}件の結果`)
     return results.slice(0, 10) // 最大10件に制限
-  } catch (error) {
-    console.error('Spotify検索エラー:', error)
-    console.log('Last.fmにフォールバックします')
+    
+  } catch (error: any) {
+    const errorMessage = error?.response?.data?.error?.message || error?.message || 'Spotify API呼び出しに失敗しました'
+    const statusCode = error?.response?.status
+    const fullError = statusCode ? `HTTP ${statusCode}: ${errorMessage}` : errorMessage
+    
+    recordSearchStatus('spotify', false, fullError, 'Spotify検索でエラーが発生したため、Last.fmにフォールバックします')
+    console.error('Spotify検索エラー詳細:', {
+      status: statusCode,
+      message: errorMessage,
+      response: error?.response?.data,
+      error
+    })
+    
     return searchMusicLastFm(query)
   }
 }
@@ -133,17 +240,30 @@ const searchMusicSpotify = async (query: string): Promise<SearchResult[]> => {
 // Last.fm APIを使用した音楽検索（元のsearchMusic関数を改名）
 const searchMusicLastFm = async (query: string): Promise<SearchResult[]> => {
   try {
+    // 検索クエリの最適化
+    const optimizedQuery = query.trim()
+    
+    console.log(`Last.fm検索実行: "${optimizedQuery}"`)
+    
     const response = await axios.get(LASTFM_BASE_URL, {
       params: {
         method: 'track.search',
-        track: query,
+        track: optimizedQuery,
         api_key: LASTFM_API_KEY,
         format: 'json',
-        limit: 10
+        limit: 15 // Spotify比較のため少し多めに取得
       }
     })
 
     const tracks = response.data.results?.trackmatches?.track || []
+    recordSearchStatus('lastfm', true)
+    console.log(`Last.fm検索結果: ${tracks.length}件`)
+    
+    if (!Array.isArray(tracks)) {
+      recordSearchStatus('lastfm', false, 'Last.fm APIの応答形式が予期しない形式です', 'レスポンスデータの構造が変更された可能性があります')
+      return []
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Last.fm APIのレスポンス型が不定のため
     return tracks.map((track: any) => {
       const imageUrl = track.image?.[3]?.['#text'] || track.image?.[2]?.['#text'] || track.image?.[1]?.['#text'] || ''
@@ -154,12 +274,21 @@ const searchMusicLastFm = async (query: string): Promise<SearchResult[]> => {
         image: isValidImageUrl(imageUrl) ? imageUrl : fallback.image,
         url: track.url,
         isGeneratedImage: !isValidImageUrl(imageUrl),
-        provider: 'lastfm'
+        provider: 'lastfm' as MusicProvider
       }
     })
-  } catch (error) {
-    // eslint-disable-next-line no-console -- APIエラー時のデバッグ用
-    console.error('音楽検索エラー:', error)
+  } catch (error: any) {
+    const errorMessage = error?.response?.data?.message || error?.message || 'Last.fm API呼び出しに失敗しました'
+    const statusCode = error?.response?.status
+    const fullError = statusCode ? `HTTP ${statusCode}: ${errorMessage}` : errorMessage
+    
+    recordSearchStatus('lastfm', false, fullError, 'Last.fm APIでエラーが発生しました')
+    console.error('Last.fm検索エラー詳細:', {
+      status: statusCode,
+      message: errorMessage,
+      response: error?.response?.data,
+      error
+    })
     return []
   }
 }
@@ -265,6 +394,10 @@ export const getAvailableProviders = (): MusicProvider[] => {
 export const searchMusic = async (query: string): Promise<SearchResult[]> => {
   const availableProviders = getAvailableProviders()
   
+  console.log(`🔍 音楽検索開始: "${query}"`)
+  console.log(`📋 利用可能プロバイダー: ${availableProviders.map(p => p.toUpperCase()).join(', ')}`)
+  console.log(`⚙️ 現在のプロバイダー: ${currentProvider.toUpperCase()}`)
+  
   // 現在のプロバイダーが利用可能かチェック
   if (availableProviders.includes(currentProvider)) {
     try {
@@ -274,32 +407,40 @@ export const searchMusic = async (query: string): Promise<SearchResult[]> => {
         case 'lastfm':
           return await searchMusicLastFm(query)
         default:
-          throw new Error(`未サポートのプロバイダー: ${currentProvider}`)
+          const errorMsg = `未サポートのプロバイダー: ${currentProvider}`
+          recordSearchStatus(currentProvider, false, errorMsg)
+          throw new Error(errorMsg)
       }
-    } catch (error) {
-      console.error(`${currentProvider}検索エラー:`, error)
+    } catch (error: any) {
+      console.error(`${currentProvider.toUpperCase()}検索エラー:`, error)
     }
+  } else {
+    const reason = `${currentProvider.toUpperCase()}は現在利用できません`
+    recordSearchStatus(currentProvider, false, reason, reason)
   }
   
   // フォールバック: 利用可能な他のプロバイダーを試行
   for (const provider of availableProviders) {
     if (provider !== currentProvider) {
       try {
-        console.log(`${provider}にフォールバックします`)
+        console.log(`🔄 ${provider.toUpperCase()}にフォールバックします`)
         switch (provider) {
           case 'spotify':
             return await searchMusicSpotify(query)
           case 'lastfm':
             return await searchMusicLastFm(query)
         }
-      } catch (error) {
-        console.error(`${provider}フォールバック失敗:`, error)
+      } catch (error: any) {
+        const errorMsg = error?.message || `${provider}フォールバック失敗`
+        recordSearchStatus(provider, false, errorMsg, `フォールバック試行中にエラー`)
+        console.error(`${provider.toUpperCase()}フォールバック失敗:`, error)
       }
     }
   }
   
   // 全てのプロバイダーが失敗した場合はモックデータ
-  console.log('全てのプロバイダーが利用不可。モックデータを使用します。')
+  console.warn('⚠️ 全てのプロバイダーが利用不可。モックデータを使用します。')
+  recordSearchStatus('lastfm', false, '全プロバイダー失敗', 'モックデータにフォールバック')
   return await searchMusicMock(query)
 }
 

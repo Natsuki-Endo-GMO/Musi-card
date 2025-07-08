@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import MusicSearchAutocomplete from '../components/MusicSearchAutocomplete'
 import { SearchResult } from '../services/musicSearch'
@@ -10,10 +10,66 @@ interface Song {
   isGeneratedImage?: boolean
 }
 
+// テーマカラーの選択肢
+interface ThemeColor {
+  id: string
+  name: string
+  gradient: string
+  primary: string
+  secondary: string
+}
+
+const THEME_COLORS: ThemeColor[] = [
+  {
+    id: 'blue',
+    name: 'ブルー',
+    gradient: 'from-blue-500 to-blue-600',
+    primary: 'blue-500',
+    secondary: 'blue-100'
+  },
+  {
+    id: 'purple',
+    name: 'パープル',
+    gradient: 'from-purple-500 to-purple-600',
+    primary: 'purple-500',
+    secondary: 'purple-100'
+  },
+  {
+    id: 'green',
+    name: 'グリーン',
+    gradient: 'from-green-500 to-green-600',
+    primary: 'green-500',
+    secondary: 'green-100'
+  },
+  {
+    id: 'pink',
+    name: 'ピンク',
+    gradient: 'from-pink-500 to-pink-600',
+    primary: 'pink-500',
+    secondary: 'pink-100'
+  },
+  {
+    id: 'orange',
+    name: 'オレンジ',
+    gradient: 'from-orange-500 to-orange-600',
+    primary: 'orange-500',
+    secondary: 'orange-100'
+  },
+  {
+    id: 'indigo',
+    name: 'インディゴ',
+    gradient: 'from-indigo-500 to-indigo-600',
+    primary: 'indigo-500',
+    secondary: 'indigo-100'
+  }
+]
+
 export default function EditUser() {
   const { username } = useParams<{ username: string }>()
   const navigate = useNavigate()
   const [songs, setSongs] = useState<Song[]>([])
+  const [userIcon, setUserIcon] = useState<string>('')
+  const [themeColor, setThemeColor] = useState<ThemeColor>(THEME_COLORS[0])
   const [loading, setLoading] = useState(true)
 
   const loadUserData = useCallback((username: string) => {
@@ -22,7 +78,15 @@ export default function EditUser() {
       if (storedData) {
         const users = JSON.parse(storedData)
         if (users[username]) {
-          setSongs(users[username])
+          const userData = users[username]
+          setSongs(userData.songs || userData) // 新旧フォーマット対応
+          setUserIcon(userData.icon || '')
+          
+          // テーマカラーの復元
+          if (userData.themeColor) {
+            const foundTheme = THEME_COLORS.find(color => color.id === userData.themeColor.id)
+            setThemeColor(foundTheme || THEME_COLORS[0])
+          }
         } else {
           alert('ユーザーが見つかりません')
           navigate('/manage')
@@ -82,26 +146,21 @@ export default function EditUser() {
 
     const validSongs = songs.filter(song => song.title.trim() && song.artist.trim())
     if (validSongs.length === 0) {
-      alert('少なくとも1曲は登録してください')
+      alert('少なくとも1つの楽曲情報を入力してください')
       return
-    }
-
-    // ジャケット画像URLの形式チェック（入力されている場合のみ）
-    for (const song of validSongs) {
-      if (song.jacket.trim() && !isValidUrl(song.jacket.trim())) {
-        alert(`「${song.title}」のジャケット画像URLが正しい形式ではありません。\n例: https://example.com/image.jpg`)
-        return
-      }
     }
 
     try {
       const storedData = localStorage.getItem('musicmeisi_users')
       const users = storedData ? JSON.parse(storedData) : {}
       
-      users[username] = validSongs.map(song => ({
-        ...song,
-        jacket: song.jacket || `https://picsum.photos/300/300?random=${Math.floor(Math.random() * 1000)}`
-      }))
+      users[username] = {
+        username,
+        icon: userIcon,
+        themeColor: themeColor,
+        songs: validSongs,
+        updatedAt: new Date().toISOString()
+      }
       
       localStorage.setItem('musicmeisi_users', JSON.stringify(users))
       
@@ -124,22 +183,22 @@ export default function EditUser() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">読み込み中...</div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center">
+        <div className="text-blue-600 text-xl">読み込み中...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
       {/* Navigation */}
-      <div className="sticky top-0 z-50 backdrop-blur-sm bg-slate-900/80 border-b border-slate-700/50">
+      <div className="sticky top-0 z-50 backdrop-blur-sm bg-white/80 border-b border-blue-200/50 shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold text-white">{username}の名刺を編集</h1>
+            <h1 className="text-xl font-bold text-blue-900">{username}の名刺を編集</h1>
             <button
               onClick={() => navigate('/manage')}
-              className="inline-flex items-center gap-2 text-slate-300 hover:text-white transition-colors duration-300"
+              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors duration-300"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
@@ -154,32 +213,60 @@ export default function EditUser() {
         <div className="max-w-2xl mx-auto">
           <form onSubmit={handleSubmit} className="space-y-8" noValidate>
             {/* User Info */}
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50">
-              <h2 className="text-2xl font-bold text-white mb-6">基本情報</h2>
-              <div>
-                <label className="block text-slate-300 text-sm font-medium mb-2">
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-blue-200/50 shadow-lg">
+              <h2 className="text-2xl font-bold text-blue-900 mb-6">基本情報</h2>
+              
+              <div className="mb-6">
+                <label className="block text-blue-700 text-sm font-medium mb-2">
                   ユーザー名
                 </label>
                 <input
                   type="text"
                   value={username}
                   disabled
-                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-slate-400 cursor-not-allowed"
+                  className="w-full px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-500 cursor-not-allowed"
                 />
-                <p className="text-slate-400 text-sm mt-2">
+                <p className="text-blue-600 text-sm mt-2">
                   ユーザー名は変更できません
+                </p>
+              </div>
+
+              {/* テーマカラー選択 */}
+              <div>
+                <label className="block text-blue-700 text-sm font-medium mb-3">
+                  名刺テーマカラー
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {THEME_COLORS.map((color) => (
+                    <button
+                      key={color.id}
+                      type="button"
+                      onClick={() => setThemeColor(color)}
+                      className={`p-3 rounded-xl border-2 transition-all duration-300 ${
+                        themeColor.id === color.id
+                          ? 'border-blue-500 shadow-lg scale-105'
+                          : 'border-blue-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <div className={`w-full h-8 bg-gradient-to-r ${color.gradient} rounded-lg mb-2`}></div>
+                      <span className="text-sm text-blue-700 font-medium">{color.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-blue-600 text-sm mt-2">
+                  選択したカラーが名刺のアクセントカラーとして使用されます
                 </p>
               </div>
             </div>
 
             {/* Songs */}
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50">
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-blue-200/50 shadow-lg">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">好きな音楽</h2>
+                <h2 className="text-2xl font-bold text-blue-900">好きな音楽</h2>
                 <button
                   type="button"
                   onClick={addSong}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors duration-300"
+                  className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors duration-300"
                 >
                   曲を追加
                 </button>
