@@ -56,8 +56,8 @@ export default function SpotifySearchAutocomplete({
   }
 
   // Spotify認証を開始
-  const handleSpotifyAuth = () => {
-    const authUrl = spotifyAuth.getAuthUrl()
+  const handleSpotifyAuth = async () => {
+    const authUrl = await spotifyAuth.getAuthUrl()
     const popup = window.open(
       authUrl,
       'spotify-auth',

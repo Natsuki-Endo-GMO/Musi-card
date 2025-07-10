@@ -1,6 +1,5 @@
-// YouTube Data API v3設定
-const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
-const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
+// YouTube Data API v3設定（サーバーサイド経由）
+const YOUTUBE_API_ENDPOINT = '/api/youtube/search';
 
 export interface YouTubeTrack {
   id: string;
@@ -13,40 +12,21 @@ export interface YouTubeTrack {
 }
 
 export const youtubeSearch = {
-  // 音楽検索
+  // 音楽検索（サーバーサイド経由）
   searchMusic: async (query: string, maxResults: number = 5): Promise<YouTubeTrack[]> => {
-    if (!YOUTUBE_API_KEY) {
-      throw new Error('YouTube API キーが設定されていません');
-    }
-
     try {
       // 音楽検索に最適化されたクエリを構築
-      const musicQuery = `${query} music audio`;
-      
       const response = await fetch(
-        `${YOUTUBE_API_BASE}/search?` +
-        `part=snippet&type=video&videoCategoryId=10&` +
-        `q=${encodeURIComponent(musicQuery)}&` +
-        `maxResults=${maxResults}&` +
-        `key=${YOUTUBE_API_KEY}`
+        `${YOUTUBE_API_ENDPOINT}?query=${encodeURIComponent(query)}&maxResults=${maxResults}`
       );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(`YouTube検索失敗: ${response.status} ${errorData.error?.message || ''}`);
+        throw new Error(`YouTube検索失敗: ${response.status} ${errorData.error || ''}`);
       }
 
       const data = await response.json();
-      
-      return data.items.map((item: any) => ({
-        id: item.id.videoId,
-        title: item.snippet.title,
-        channelTitle: item.snippet.channelTitle,
-        thumbnail: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default.url,
-        duration: 'Unknown',
-        videoId: item.id.videoId,
-        embedUrl: `https://www.youtube.com/embed/${item.id.videoId}?autoplay=1&start=0&end=30`
-      }));
+      return data.results || [];
     } catch (error) {
       console.error('YouTube検索エラー:', error);
       throw error;

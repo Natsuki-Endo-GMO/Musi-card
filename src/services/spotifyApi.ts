@@ -15,34 +15,71 @@ const SCOPES = [
   'user-library-read'
 ].join(' ');
 
+// PKCE用のユーティリティ関数
+function generateCodeVerifier(): string {
+  const array = new Uint32Array(32);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...new Uint8Array(array.buffer)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+async function generateCodeChallenge(verifier: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
 // 認証関連
 export const spotifyAuth = {
-  // 認証URLを生成
-  getAuthUrl: () => {
+  // 認証URLを生成（PKCE対応）
+  getAuthUrl: async () => {
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+    
+    // code_verifierをlocalStorageに保存
+    localStorage.setItem('spotify_code_verifier', codeVerifier);
+    
     const params = new URLSearchParams({
       client_id: CLIENT_ID,
       response_type: 'code',
       redirect_uri: REDIRECT_URI,
       scope: SCOPES,
+      code_challenge_method: 'S256',
+      code_challenge: codeChallenge,
       state: generateRandomString(16)
     });
     return `${AUTH_ENDPOINT}?${params.toString()}`;
   },
 
-  // アクセストークンを取得
+  // アクセストークンを取得（PKCE対応）
   getAccessToken: async (code: string): Promise<string> => {
+    const codeVerifier = localStorage.getItem('spotify_code_verifier');
+    if (!codeVerifier) {
+      throw new Error('Code verifier not found');
+    }
+
     const response = await fetch(TOKEN_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${btoa(`${CLIENT_ID}:`)}`
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: REDIRECT_URI
+        redirect_uri: REDIRECT_URI,
+        client_id: CLIENT_ID,
+        code_verifier: codeVerifier
       })
     });
+
+    // code_verifierを削除
+    localStorage.removeItem('spotify_code_verifier');
 
     if (!response.ok) {
       throw new Error('Failed to get access token');
