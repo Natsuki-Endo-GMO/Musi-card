@@ -48,17 +48,28 @@ export const loadUser = (username: string): UserProfile | null => {
       return null
     }
     
-    // マイグレーション: gridLayoutプロパティが存在しない場合のデフォルト値設定
+    // マイグレーション: gridLayoutプロパティの確認と更新
+    let needsMigration = false
+    let migratedData = { ...userData }
+    
     if (!userData.gridLayout) {
-      const migratedData = {
-        ...userData,
-        gridLayout: GRID_LAYOUTS[1] // デフォルトは4x4
-      }
-      
+      // gridLayoutが存在しない場合はデフォルト値を設定
+      migratedData.gridLayout = GRID_LAYOUTS[1] // デフォルトは4x4
+      needsMigration = true
+      console.log(`🔄 ユーザー「${username}」: gridLayoutを追加`)
+    } else if (userData.gridLayout && 'centerPosition' in userData.gridLayout) {
+      // 古いcenterPositionプロパティから新しいcenterPositionsに移行
+      const oldLayout = userData.gridLayout as any
+      const newLayout = GRID_LAYOUTS.find(layout => layout.size === oldLayout.size) || GRID_LAYOUTS[1]
+      migratedData.gridLayout = newLayout
+      needsMigration = true
+      console.log(`🔄 ユーザー「${username}」: centerPosition → centerPositions に更新`)
+    }
+    
+    if (needsMigration) {
       // マイグレーション後のデータを保存
       saveUser(migratedData)
-      console.log(`🔄 ユーザー「${username}」のデータをマイグレーションしました（gridLayout追加）`)
-      
+      console.log(`✅ ユーザー「${username}」のデータマイグレーションが完了しました`)
       return migratedData
     }
     

@@ -258,27 +258,6 @@ export default function UserPage() {
 
         {/* メインコンテンツ */}
         <div className="flex flex-col items-center justify-center px-6 py-12">
-          {/* グリッドレイアウト選択 */}
-          <div className="mb-6 flex flex-wrap gap-2 justify-center">
-            <span className="text-white/80 text-sm mr-2">レイアウト:</span>
-            {GRID_LAYOUTS.map((layout) => (
-              <button
-                key={layout.id}
-                onClick={() => {
-                  // 将来的にはこちらで保存処理を行う
-                  console.log(`レイアウト変更: ${layout.name}`)
-                }}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  (userProfile.gridLayout?.id || GRID_LAYOUTS[1].id) === layout.id
-                    ? 'bg-white text-black' 
-                    : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
-                }`}
-              >
-                {layout.name}
-              </button>
-            ))}
-          </div>
-          
           {/* グリッドレイアウト */}
           <div className="w-full max-w-4xl">
             <div 
@@ -289,15 +268,34 @@ export default function UserPage() {
               }}
             >
               {Array.from({ length: userProfile.gridLayout?.totalCells || GRID_LAYOUTS[1].totalCells }).map((_, index) => {
-                const centerPosition = userProfile.gridLayout?.centerPosition || GRID_LAYOUTS[1].centerPosition
-                const isCenterCell = index === centerPosition
-                const songIndex = isCenterCell ? -1 : index < centerPosition ? index : index - 1
+                const centerPositions = userProfile.gridLayout?.centerPositions || GRID_LAYOUTS[1].centerPositions
+                const isCenterCell = centerPositions.includes(index)
+                
+                // 楽曲のインデックス計算（中央セルを除く）
+                let songIndex = -1
+                if (!isCenterCell) {
+                  // 現在のindexより前にある中央セルの数を計算
+                  const centerCellsBefore = centerPositions.filter(pos => pos < index).length
+                  songIndex = index - centerCellsBefore
+                }
+                
                 const song = songIndex >= 0 && songIndex < userProfile.songs.length ? userProfile.songs[songIndex] : null
+                
+                                // 4マス中央の場合、最初のセル以外はスキップ
+                if (isCenterCell && centerPositions.length === 4 && index !== centerPositions[0]) {
+                  return null
+                }
                 
                 return (
                   <div
                     key={index}
                     className="aspect-square relative overflow-hidden rounded-lg"
+                    style={
+                      isCenterCell && centerPositions.length === 4 ? {
+                        gridColumn: `${(centerPositions[0] % (userProfile.gridLayout?.size || GRID_LAYOUTS[1].size)) + 1} / span 2`,
+                        gridRow: `${Math.floor(centerPositions[0] / (userProfile.gridLayout?.size || GRID_LAYOUTS[1].size)) + 1} / span 2`
+                      } : {}
+                    }
                   >
                     {isCenterCell ? (
                       /* 中央セル - プロフィールアイコン */
@@ -309,10 +307,10 @@ export default function UserPage() {
                             className="w-full h-full object-cover rounded-lg border-2 border-white/30 shadow-xl"
                           />
                         ) : (
-                          <div className={`w-full h-full rounded-lg bg-gradient-to-br ${theme.gradient} flex items-center justify-center text-white font-bold shadow-xl border-2 border-white/30`}>
-                            <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl">
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/20 to-white/10 rounded-lg border-2 border-white/30">
+                            <div className="text-white/60 text-4xl font-bold">
                               {userProfile.displayName.charAt(0).toUpperCase()}
-                            </span>
+                            </div>
                           </div>
                         )}
                       </div>

@@ -255,6 +255,70 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* グリッドレイアウト選択 */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">グリッドレイアウト</h2>
+              
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  音楽名刺のグリッドレイアウトを選択してください
+                </p>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  {GRID_LAYOUTS.map((layout) => (
+                    <button
+                      key={layout.id}
+                      onClick={() => setUserProfile({
+                        ...userProfile,
+                        gridLayout: layout
+                      })}
+                      className={`p-4 rounded-lg border-2 transition-all text-left ${
+                        userProfile.gridLayout?.id === layout.id
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                      }`}
+                    >
+                      <div className="font-medium text-sm mb-1">{layout.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {layout.centerPositions.length === 1 ? '中央1マス' : '中央4マス'}のアイコン配置
+                      </div>
+                      
+                      {/* プレビューグリッド */}
+                      <div 
+                        className="mt-2 grid gap-0.5 w-12 h-12"
+                        style={{
+                          gridTemplateColumns: `repeat(${layout.size}, 1fr)`,
+                          gridTemplateRows: `repeat(${layout.size}, 1fr)`
+                        }}
+                      >
+                        {Array.from({ length: layout.totalCells }).map((_, index) => {
+                          const isCenterCell = layout.centerPositions.includes(index)
+                          if (isCenterCell && layout.centerPositions.length === 4 && index !== layout.centerPositions[0]) {
+                            return null
+                          }
+                          
+                          return (
+                            <div
+                              key={index}
+                              className={`rounded-sm ${
+                                isCenterCell ? 'bg-blue-400' : 'bg-gray-300'
+                              }`}
+                              style={
+                                isCenterCell && layout.centerPositions.length === 4 ? {
+                                  gridColumn: `${(layout.centerPositions[0] % layout.size) + 1} / span 2`,
+                                  gridRow: `${Math.floor(layout.centerPositions[0] / layout.size) + 1} / span 2`
+                                } : {}
+                              }
+                            />
+                          )
+                        })}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* 音楽追加 */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-gray-800 mb-4">音楽を追加</h2>

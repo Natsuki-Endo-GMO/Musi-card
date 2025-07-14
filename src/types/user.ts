@@ -43,7 +43,7 @@ export interface GridLayout {
   name: string
   size: number // 3x3, 4x4, 5x5など
   totalCells: number
-  centerPosition: number // 中央のセル位置
+  centerPositions: number[] // 中央に配置するセルの位置配列（1マスまたは4マス）
 }
 
 export interface UserProfile {
@@ -139,28 +139,28 @@ export const GRID_LAYOUTS: GridLayout[] = [
     name: '3×3 (9セル)',
     size: 3,
     totalCells: 9,
-    centerPosition: 4 // 0-indexed
+    centerPositions: [4] // 中央1マス (奇数グリッド)
   },
   {
     id: '4x4',
     name: '4×4 (16セル)',
     size: 4,
     totalCells: 16,
-    centerPosition: 6 // 中央に近い位置
+    centerPositions: [5, 6, 9, 10] // 中央4マス (偶数グリッド)
   },
   {
     id: '5x5',
     name: '5×5 (25セル)',
     size: 5,
     totalCells: 25,
-    centerPosition: 12 // 完全に中央
+    centerPositions: [12] // 中央1マス (奇数グリッド)
   },
   {
     id: '6x6',
     name: '6×6 (36セル)',
     size: 6,
     totalCells: 36,
-    centerPosition: 15 // 中央に近い位置
+    centerPositions: [14, 15, 20, 21] // 中央4マス (偶数グリッド)
   }
 ]
 
