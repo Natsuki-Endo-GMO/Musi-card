@@ -11,7 +11,10 @@ export default function SpotifyDebugInfo() {
     port: typeof window !== 'undefined' ? window.location.port : 'unknown',
     envVar: import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'not set',
     hasCodeVerifier: typeof window !== 'undefined' ? !!localStorage.getItem('spotify_code_verifier') : false,
-    hasSavedState: typeof window !== 'undefined' ? !!localStorage.getItem('spotify_auth_state') : false
+    hasSavedState: typeof window !== 'undefined' ? !!localStorage.getItem('spotify_auth_state') : false,
+    codeVerifierTimestamp: typeof window !== 'undefined' ? localStorage.getItem('spotify_code_verifier_timestamp') : null,
+    currentState: typeof window !== 'undefined' ? localStorage.getItem('spotify_current_state') : null,
+    newAuthCount: typeof window !== 'undefined' ? Object.keys(localStorage).filter(key => key.startsWith('spotify_auth_')).length : 0
   };
 
   return (
@@ -53,6 +56,27 @@ export default function SpotifyDebugInfo() {
         <div className={debugInfo.hasSavedState ? 'text-green-600' : 'text-red-600'}>
           {debugInfo.hasSavedState ? '✅ 存在' : '❌ なし'}
         </div>
+
+        <div><strong>Verifier作成時刻:</strong></div>
+        <div className={debugInfo.codeVerifierTimestamp ? 'text-blue-600' : 'text-gray-500'}>
+          {debugInfo.codeVerifierTimestamp 
+            ? new Date(parseInt(debugInfo.codeVerifierTimestamp)).toLocaleTimeString()
+            : 'なし'
+          }
+        </div>
+
+        <div><strong>現在のState:</strong></div>
+        <div className={debugInfo.currentState ? 'text-blue-600' : 'text-gray-500'}>
+          {debugInfo.currentState 
+            ? debugInfo.currentState.substring(0, 10) + '...'
+            : 'なし'
+          }
+        </div>
+
+        <div><strong>認証セッション数:</strong></div>
+        <div className={debugInfo.newAuthCount > 0 ? 'text-green-600' : 'text-gray-500'}>
+          {debugInfo.newAuthCount}個
+        </div>
       </div>
 
       <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
@@ -63,6 +87,16 @@ export default function SpotifyDebugInfo() {
           3. App Type: Web Application
         </p>
       </div>
+
+      {debugInfo.newAuthCount > 1 && (
+        <div className="mt-2 p-3 bg-orange-50 border border-orange-200 rounded">
+          <p className="text-orange-800 text-xs">
+            <strong>⚠️ 複数タブ警告:</strong><br/>
+            {debugInfo.newAuthCount}個の認証セッションが存在しています。<br/>
+            他のタブで認証中の場合、code_verifier不一致エラーが発生する可能性があります。
+          </p>
+        </div>
+      )}
     </div>
   );
 } 

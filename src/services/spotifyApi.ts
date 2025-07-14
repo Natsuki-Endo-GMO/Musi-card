@@ -48,30 +48,57 @@ const SCOPES = [
   'user-read-email'
 ].join(' ');
 
-// PKCE用のユーティリティ関数
+// PKCE用のユーティリティ関数（RFC 7636準拠）
 function generateCodeVerifier(): string {
-  const array = new Uint32Array(32);
+  // RFC 7636: 43-128文字、unreserved characters のみ
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const length = 128; // 最大長を使用してセキュリティを強化
+  
+  const array = new Uint8Array(length);
   crypto.getRandomValues(array);
-  return btoa(String.fromCharCode(...new Uint8Array(array.buffer)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
+  
+  const verifier = Array.from(array, byte => charset[byte % charset.length]).join('');
+  
+  // デバッグログ（開発環境のみ）
+  if (import.meta.env.DEV) {
+    console.log('🔐 Code Verifier生成 (RFC7636準拠):', {
+      length: verifier.length,
+      verifier: verifier.substring(0, 15) + '...',
+      charset: 'A-Z,a-z,0-9,-,.,_,~'
+    });
+  }
+  
+  return verifier;
 }
 
 async function generateCodeChallenge(verifier: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(verifier);
   const digest = await crypto.subtle.digest('SHA-256', data);
-  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+  
+  // base64url encoding without padding
+  const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
-    .replace(/=/g, '');
+    .replace(/=+$/, ''); // padding除去
+  
+  // デバッグログ（開発環境のみ）
+  if (import.meta.env.DEV) {
+    console.log('🔐 Code Challenge生成 (S256):', {
+      verifierLength: verifier.length,
+      challengeLength: challenge.length,
+      challenge: challenge.substring(0, 15) + '...',
+      method: 'S256'
+    });
+  }
+  
+  return challenge;
 }
 
 // 認証関連
 export const spotifyAuth = {
   // 現在のリダイレクトURIを取得（デバッグ用）
-  getCurrentRedirectUri: () => getRedirectUri(),
+  getCurrentRedirectUri: (): string => getRedirectUri(),
   
   // 認証URLを生成（PKCE対応）
   getAuthUrl: async () => {
@@ -79,12 +106,19 @@ export const spotifyAuth = {
     const codeChallenge = await generateCodeChallenge(codeVerifier);
     const redirectUri = getRedirectUri();
     
-    // code_verifierをlocalStorageに保存
-    localStorage.setItem('spotify_code_verifier', codeVerifier);
-    
-    // state生成とlocalStorageに保存
+    // state生成
     const state = generateRandomString(32);
-    localStorage.setItem('spotify_auth_state', state);
+    const timestamp = Date.now();
+    
+    // stateごとにcode_verifierを管理（複数タブ対応）
+    const authData = {
+      codeVerifier,
+      timestamp,
+      state
+    };
+    
+    localStorage.setItem(`spotify_auth_${state}`, JSON.stringify(authData));
+    localStorage.setItem('spotify_current_state', state);
     
     // デバッグ用ログ（開発環境のみ）
     if (import.meta.env.DEV) {
@@ -113,10 +147,70 @@ export const spotifyAuth = {
   },
 
   // アクセストークンを取得（PKCE対応）
-  getAccessToken: async (code: string): Promise<string> => {
-    const codeVerifier = localStorage.getItem('spotify_code_verifier');
+  getAccessToken: async (code: string, state?: string): Promise<string> => {
+    // state が提供されていない場合は従来の方法で取得を試行
+    if (!state) {
+      const currentState = localStorage.getItem('spotify_current_state');
+      if (currentState) {
+        state = currentState;
+      }
+    }
+    
+    let codeVerifier: string | null = null;
+    let timestamp: number | null = null;
+    
+    if (state) {
+      // stateを使用して対応するcode_verifierを取得
+      const authDataStr = localStorage.getItem(`spotify_auth_${state}`);
+      if (authDataStr) {
+        try {
+          const authData = JSON.parse(authDataStr);
+          codeVerifier = authData.codeVerifier;
+          timestamp = authData.timestamp;
+          
+          console.log('✅ State対応認証データ取得成功:', {
+            state: state.substring(0, 10) + '...',
+            hasCodeVerifier: !!codeVerifier,
+            作成時刻: timestamp ? new Date(timestamp).toLocaleTimeString() : 'unknown'
+          });
+        } catch (e) {
+          console.error('❌ 認証データ解析エラー:', e);
+        }
+      }
+    }
+    
+    // フォールバック: 古い方法での取得
     if (!codeVerifier) {
-      throw new Error('Code verifier not found');
+      codeVerifier = localStorage.getItem('spotify_code_verifier');
+      const timestampStr = localStorage.getItem('spotify_code_verifier_timestamp');
+      if (timestampStr) {
+        timestamp = parseInt(timestampStr);
+      }
+      
+      if (codeVerifier) {
+        console.log('⚠️ フォールバック: 古い方式でcode_verifier取得');
+      }
+    }
+    
+    if (!codeVerifier) {
+      throw new Error('Code verifier not found - 認証を最初からやり直してください');
+    }
+    
+    // タイムスタンプチェック
+    if (timestamp) {
+      const currentTime = Date.now();
+      const elapsedMinutes = Math.floor((currentTime - timestamp) / 60000);
+      
+      console.log('🕐 Code Verifier時間確認:', {
+        作成時刻: new Date(timestamp).toLocaleTimeString(),
+        現在時刻: new Date(currentTime).toLocaleTimeString(),
+        経過時間: `${elapsedMinutes}分`,
+        制限時間: '10分'
+      });
+      
+      if (elapsedMinutes > 10) {
+        console.warn('⚠️ Code Verifierが10分以上経過しています');
+      }
     }
 
     const redirectUri = getRedirectUri();
@@ -134,6 +228,8 @@ export const spotifyAuth = {
     console.log(`   Client ID: ${CLIENT_ID ? '設定済み' : '❌ 未設定'}`);
     console.log(`   認証コード: ${code.substring(0, 10)}...`);
     console.log(`   Code Verifier: ${codeVerifier ? '設定済み' : '❌ 未設定'}`);
+    console.log(`   Code Verifier長さ: ${codeVerifier ? codeVerifier.length : 0}`);
+    console.log(`   Code Verifier先頭: ${codeVerifier ? codeVerifier.substring(0, 15) + '...' : 'なし'}`);
 
     const response = await fetch(TOKEN_ENDPOINT, {
       method: 'POST',
@@ -143,20 +239,34 @@ export const spotifyAuth = {
       body: new URLSearchParams(requestBody)
     });
 
-    // code_verifierを削除
-    localStorage.removeItem('spotify_code_verifier');
-
-    if (!response.ok) {
-      let errorDetails = 'Unknown error';
-      try {
-        const errorData = await response.json();
-        errorDetails = JSON.stringify(errorData, null, 2);
-        console.error('❌ Token exchange失敗:', errorData);
-      } catch (e) {
-        console.error('❌ Token exchange失敗: レスポンス解析エラー');
-      }
-      throw new Error(`Failed to get access token: ${response.status} - ${errorDetails}`);
+    // 使用済みの認証データを削除
+    if (state) {
+      localStorage.removeItem(`spotify_auth_${state}`);
     }
+    localStorage.removeItem('spotify_current_state');
+    // 古い方式のデータも削除（フォールバック対応）
+    localStorage.removeItem('spotify_code_verifier');
+    localStorage.removeItem('spotify_code_verifier_timestamp');
+
+          if (!response.ok) {
+        // エラー時も認証データをクリーンアップ
+        if (state) {
+          localStorage.removeItem(`spotify_auth_${state}`);
+        }
+        localStorage.removeItem('spotify_current_state');
+        localStorage.removeItem('spotify_code_verifier');
+        localStorage.removeItem('spotify_code_verifier_timestamp');
+        
+        let errorDetails = 'Unknown error';
+        try {
+          const errorData = await response.json();
+          errorDetails = JSON.stringify(errorData, null, 2);
+          console.error('❌ Token exchange失敗:', errorData);
+        } catch (e) {
+          console.error('❌ Token exchange失敗: レスポンス解析エラー');
+        }
+        throw new Error(`Failed to get access token: ${response.status} - ${errorDetails}`);
+      }
 
     const data = await response.json();
     console.log('✅ Token exchange成功!');

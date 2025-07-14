@@ -68,12 +68,12 @@ export default function SpotifyCallback() {
         console.log('🔄 認証コードをアクセストークンに交換中...')
 
         // 認証コードをアクセストークンに交換（PKCEフロー）
-        const accessToken = await spotifyAuth.getAccessToken(code)
+        const accessToken = await spotifyAuth.getAccessToken(code, state)
         
         // アクセストークンを保存
         setSpotifyAccessToken(accessToken)
         
-        // 使用済みのstate情報をクリア
+        // 使用済みの認証情報をクリア（新しい実装では自動クリア）
         localStorage.removeItem('spotify_auth_state')
         
         // 音楽検索プロバイダーをSpotifyに設定
