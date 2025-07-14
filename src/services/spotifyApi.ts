@@ -1,6 +1,29 @@
 // Spotify API設定
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
-const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://localhost:3000/callback';
+
+// 環境に応じたコールバックURL生成
+const getRedirectUri = (): string => {
+  // 環境変数で明示的に指定されている場合はそれを使用
+  if (import.meta.env.VITE_SPOTIFY_REDIRECT_URI) {
+    return import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
+  }
+  
+  // 自動検出：現在のURLから動的に生成
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname, port } = window.location;
+    
+    // ローカル開発環境の検出
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return `${protocol}//${hostname}:${port || '5173'}/callback`;
+    }
+    
+    // Vercel本番環境または他の本番環境
+    return `${protocol}//${hostname}/callback`;
+  }
+  
+  // フォールバック（SSR環境など）
+  return 'http://127.0.0.1:5173/callback';
+};
 
 // Spotify API エンドポイント
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
@@ -37,18 +60,29 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 
 // 認証関連
 export const spotifyAuth = {
+  // 現在のリダイレクトURIを取得（デバッグ用）
+  getCurrentRedirectUri: () => getRedirectUri(),
+  
   // 認証URLを生成（PKCE対応）
   getAuthUrl: async () => {
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = await generateCodeChallenge(codeVerifier);
+    const redirectUri = getRedirectUri();
     
     // code_verifierをlocalStorageに保存
     localStorage.setItem('spotify_code_verifier', codeVerifier);
     
+    // デバッグ用ログ
+    console.log('🎵 Spotify Auth:', {
+      redirectUri,
+      environment: import.meta.env.MODE,
+      hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown'
+    });
+    
     const params = new URLSearchParams({
       client_id: CLIENT_ID,
       response_type: 'code',
-      redirect_uri: REDIRECT_URI,
+      redirect_uri: redirectUri,
       scope: SCOPES,
       code_challenge_method: 'S256',
       code_challenge: codeChallenge,
@@ -72,7 +106,7 @@ export const spotifyAuth = {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: getRedirectUri(),
         client_id: CLIENT_ID,
         code_verifier: codeVerifier
       })
