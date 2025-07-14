@@ -38,6 +38,14 @@ export interface SocialLinks {
   website?: string
 }
 
+export interface GridLayout {
+  id: string
+  name: string
+  size: number // 3x3, 4x4, 5x5など
+  totalCells: number
+  centerPosition: number // 中央のセル位置
+}
+
 export interface UserProfile {
   username: string
   displayName: string
@@ -50,6 +58,7 @@ export interface UserProfile {
   birthdate?: string
   favoriteGenres: string[]
   songs: Song[]
+  gridLayout: GridLayout
   createdAt: string
   updatedAt: string
   viewCount: number
@@ -121,6 +130,37 @@ export const THEME_COLORS: ThemeColor[] = [
     gradient: 'from-teal-500 to-teal-600',
     primary: 'teal-500',
     secondary: 'teal-100'
+  }
+]
+
+export const GRID_LAYOUTS: GridLayout[] = [
+  {
+    id: '3x3',
+    name: '3×3 (9セル)',
+    size: 3,
+    totalCells: 9,
+    centerPosition: 4 // 0-indexed
+  },
+  {
+    id: '4x4',
+    name: '4×4 (16セル)',
+    size: 4,
+    totalCells: 16,
+    centerPosition: 6 // 中央に近い位置
+  },
+  {
+    id: '5x5',
+    name: '5×5 (25セル)',
+    size: 5,
+    totalCells: 25,
+    centerPosition: 12 // 完全に中央
+  },
+  {
+    id: '6x6',
+    name: '6×6 (36セル)',
+    size: 6,
+    totalCells: 36,
+    centerPosition: 15 // 中央に近い位置
   }
 ]
 

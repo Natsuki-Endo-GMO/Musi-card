@@ -7,7 +7,7 @@ import ShareProfile from '../components/ShareProfile'
 import MusicStats from '../components/MusicStats'
 import { spotifySearch } from '../services/spotifyApi'
 import { youtubeSearch } from '../services/youtubeApi'
-import { UserProfile, Song, THEME_COLORS } from '../types/user'
+import { UserProfile, Song, THEME_COLORS, GRID_LAYOUTS } from '../types/user'
 import { storageService } from '../services/storageService'
 
 export default function UserPage() {
@@ -56,6 +56,7 @@ export default function UserPage() {
               previewUrl: null,
               addedAt: new Date().toISOString()
             })),
+            gridLayout: GRID_LAYOUTS[1], // デフォルトは4x4
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             viewCount: 0,
@@ -257,64 +258,107 @@ export default function UserPage() {
 
         {/* メインコンテンツ */}
         <div className="flex flex-col items-center justify-center px-6 py-12">
-          {/* 楽曲ジャケット配置 - 中央にアイコン */}
-          <div className="relative w-full max-w-7xl flex items-center justify-center">
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-3 sm:gap-4 md:gap-6 lg:gap-8 items-center justify-items-center">
-              {userProfile.songs.map((song, index) => {
-                // 中央付近の位置を計算（デスクトップで中央にアイコンを配置）
-                const totalSongs = userProfile.songs.length
-                const isCenter = index === Math.floor(totalSongs / 2)
-                const isNearCenter = Math.abs(index - Math.floor(totalSongs / 2)) <= 1
+          {/* グリッドレイアウト選択 */}
+          <div className="mb-6 flex flex-wrap gap-2 justify-center">
+            <span className="text-white/80 text-sm mr-2">レイアウト:</span>
+            {GRID_LAYOUTS.map((layout) => (
+              <button
+                key={layout.id}
+                onClick={() => {
+                  // 将来的にはこちらで保存処理を行う
+                  console.log(`レイアウト変更: ${layout.name}`)
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  userProfile.gridLayout.id === layout.id
+                    ? 'bg-white text-black' 
+                    : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
+                }`}
+              >
+                {layout.name}
+              </button>
+            ))}
+          </div>
+          
+          {/* グリッドレイアウト */}
+          <div className="w-full max-w-4xl">
+            <div 
+              className={`grid gap-2 aspect-square`}
+              style={{
+                gridTemplateColumns: `repeat(${userProfile.gridLayout.size}, 1fr)`,
+                gridTemplateRows: `repeat(${userProfile.gridLayout.size}, 1fr)`
+              }}
+            >
+              {Array.from({ length: userProfile.gridLayout.totalCells }).map((_, index) => {
+                const isCenterCell = index === userProfile.gridLayout.centerPosition
+                const songIndex = isCenterCell ? -1 : index < userProfile.gridLayout.centerPosition ? index : index - 1
+                const song = songIndex >= 0 && songIndex < userProfile.songs.length ? userProfile.songs[songIndex] : null
                 
                 return (
                   <div
                     key={index}
-                    onClick={() => handleSongClick(song)}
-                    className={`relative cursor-pointer transform hover:scale-105 transition-all duration-300 hover:shadow-2xl group ${
-                      loadingPreview ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
+                    className="aspect-square relative overflow-hidden rounded-lg"
                   >
-                    <div className="relative">
-                      <img
-                        src={song.jacket}
-                        alt=""
-                        className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 xl:w-32 xl:h-32 object-cover rounded-lg shadow-lg"
-                      />
-                      {/* ホバー時の再生ボタン */}
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300 rounded-lg flex items-center justify-center">
-                        <div className="bg-white bg-opacity-90 rounded-full p-2 sm:p-3 transform scale-0 group-hover:scale-100 transition-transform duration-300">
-                          <svg className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-gray-800" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M8 5v14l11-7z"/>
-                          </svg>
+                    {isCenterCell ? (
+                      /* 中央セル - プロフィールアイコン */
+                      <div className="w-full h-full flex items-center justify-center bg-black/10 backdrop-blur-sm">
+                        {userProfile.icon ? (
+                          <img 
+                            src={userProfile.icon} 
+                            alt={`${userProfile.displayName}のアイコン`}
+                            className="w-full h-full object-cover rounded-lg border-2 border-white/30 shadow-xl"
+                          />
+                        ) : (
+                          <div className={`w-full h-full rounded-lg bg-gradient-to-br ${theme.gradient} flex items-center justify-center text-white font-bold shadow-xl border-2 border-white/30`}>
+                            <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl">
+                              {userProfile.displayName.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : song ? (
+                      /* 楽曲セル */
+                      <div
+                        onClick={() => handleSongClick(song)}
+                        className={`w-full h-full cursor-pointer transform hover:scale-105 transition-all duration-300 hover:shadow-2xl group ${
+                          loadingPreview ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        <div className="relative w-full h-full">
+                          <img
+                            src={song.jacket}
+                            alt=""
+                            className="w-full h-full object-cover rounded-lg shadow-lg"
+                          />
+                          {/* ホバー時の再生ボタン */}
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300 rounded-lg flex items-center justify-center">
+                            <div className="bg-white bg-opacity-90 rounded-full p-2 sm:p-3 transform scale-0 group-hover:scale-100 transition-transform duration-300">
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-gray-800" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z"/>
+                              </svg>
+                            </div>
+                          </div>
+                          
+                          {/* ホバー時の楽曲情報 */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-0 group-hover:bg-opacity-90 transition-all duration-300 rounded-b-lg p-2 opacity-0 group-hover:opacity-100">
+                            <p className="text-white text-xs font-medium truncate">{song.title}</p>
+                            <p className="text-white/80 text-xs truncate">{song.artist}</p>
+                          </div>
                         </div>
                       </div>
-                      
-                      {/* ホバー時の楽曲情報 */}
-                      <div className="absolute -bottom-12 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-0 group-hover:bg-opacity-90 transition-all duration-300 rounded-lg p-2 w-max max-w-48 opacity-0 group-hover:opacity-100 z-10">
-                        <p className="text-white text-xs font-medium truncate">{song.title}</p>
-                        <p className="text-white/80 text-xs truncate">{song.artist}</p>
+                    ) : (
+                      /* 空のセル */
+                      <div className="w-full h-full bg-white/5 rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center">
+                        <div className="text-white/30 text-center">
+                          <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          <p className="text-xs">空き</p>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )
               })}
-            </div>
-            
-            {/* 中央のプロフィールアイコン（絶対配置） */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="pointer-events-auto">
-                {userProfile.icon ? (
-                  <img 
-                    src={userProfile.icon} 
-                    alt={`${userProfile.displayName}のアイコン`}
-                    className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 lg:w-56 lg:h-56 xl:w-64 xl:h-64 rounded-full object-cover border-4 border-white/30 shadow-2xl bg-black"
-                  />
-                ) : (
-                  <div className={`w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 lg:w-56 lg:h-56 xl:w-64 xl:h-64 rounded-full bg-gradient-to-br ${theme.gradient} flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold shadow-2xl border-4 border-white/30`}>
-                    {userProfile.displayName.charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
           
