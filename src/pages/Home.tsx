@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { startSpotifyAuth, generateSpotifyAuthUrl } from '../services/musicSearch'
+import SpotifyDebugInfo from '../components/SpotifyDebugInfo'
 
 export default function Home() {
   return (
@@ -124,6 +125,13 @@ export default function Home() {
             </div>
           </div>
         </div>
+        
+        {/* デバッグ情報（開発環境のみ） */}
+        {import.meta.env.DEV && (
+          <div className="mt-8">
+            <SpotifyDebugInfo />
+          </div>
+        )}
       </div>
     </div>
   )

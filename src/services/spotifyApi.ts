@@ -8,6 +8,13 @@ const getRedirectUri = (): string => {
     return import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
   }
   
+  // Vercel環境の検出（本番環境）
+  if (import.meta.env.PROD && typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+    // Vercel本番環境では確実にhttpsを使用
+    return `${protocol}//${hostname}/callback`;
+  }
+  
   // 自動検出：現在のURLから動的に生成
   if (typeof window !== 'undefined') {
     const { protocol, hostname, port } = window.location;
@@ -17,11 +24,16 @@ const getRedirectUri = (): string => {
       return `${protocol}//${hostname}:${port || '5173'}/callback`;
     }
     
-    // Vercel本番環境または他の本番環境
+    // その他の本番環境
     return `${protocol}//${hostname}/callback`;
   }
   
   // フォールバック（SSR環境など）
+  // 本番環境では環境変数設定を強制
+  if (import.meta.env.PROD) {
+    throw new Error('本番環境では VITE_SPOTIFY_REDIRECT_URI を設定してください');
+  }
+  
   return 'http://127.0.0.1:5173/callback';
 };
 
@@ -76,7 +88,11 @@ export const spotifyAuth = {
     console.log('🎵 Spotify Auth:', {
       redirectUri,
       environment: import.meta.env.MODE,
-      hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown'
+      isProd: import.meta.env.PROD,
+      hostname: typeof window !== 'undefined' ? window.location.hostname : 'SSR',
+      protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown',
+      port: typeof window !== 'undefined' ? window.location.port : 'unknown',
+      envVar: import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'not set'
     });
     
     const params = new URLSearchParams({
