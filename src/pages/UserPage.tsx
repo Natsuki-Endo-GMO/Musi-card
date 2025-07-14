@@ -8,7 +8,7 @@ import MusicStats from '../components/MusicStats'
 import { spotifySearch, SpotifyTrack } from '../services/spotifyApi'
 import { youtubeSearch, YouTubeTrack } from '../services/youtubeApi'
 import { UserProfile, Song, ThemeColor, THEME_COLORS } from '../types/user'
-import { loadUser, incrementViewCount } from '../utils/userData'
+import { storageService } from '../services/storageService'
 
 // デフォルトテーマカラー
 const DEFAULT_THEME: ThemeColor = THEME_COLORS[0]
@@ -44,32 +44,42 @@ export default function UserPage() {
     }
   }, [username])
 
-  const loadUserData = (username: string) => {
+  const loadUserData = async (username: string) => {
     try {
-      // 新しいデータ管理ユーティリティを使用
-      const userData = loadUser(username)
+      // 新しいストレージサービスを使用（フォールバック付き）
+      const userData = await storageService.loadUser(username)
       
       if (userData) {
-        setUserProfile({
-          ...userData,
-          themeColor: userData.themeColor || DEFAULT_THEME
-        })
-        // 訪問者数を増加
-        incrementViewCount(username)
+        setUserProfile(userData)
+        console.log(`✅ ユーザー「${username}」のデータを読み込みました`)
+        
+        // ビューカウントを増加
+        await storageService.incrementViewCount(username)
       } else {
-        // ローカルストレージにない場合はサンプルデータから検索
-        if (usersData[username as keyof typeof usersData]) {
-          setUserProfile({
+        console.log(`⚠️ ユーザー「${username}」のデータが見つかりません`)
+        
+        // users.jsonからのフォールバック（既存の動作を維持）
+        const staticUserSongs = usersData[username as keyof typeof usersData]
+        if (staticUserSongs) {
+          const fallbackProfile: UserProfile = {
             ...createDefaultProfile(username),
-            songs: usersData[username as keyof typeof usersData],
+            songs: staticUserSongs.map(song => ({
+              ...song,
+              id: `${song.title}-${song.artist}`.replace(/\s+/g, '-').toLowerCase(),
+              previewUrl: null,
+              addedAt: new Date().toISOString()
+            })),
             displayName: username
-          })
+          }
+          setUserProfile(fallbackProfile)
+          console.log(`📄 users.jsonからフォールバックデータを使用: ${username}`)
         } else {
           setUserProfile(createDefaultProfile(username))
+          console.log(`🆕 デフォルトプロフィールを作成: ${username}`)
         }
       }
     } catch (error) {
-      console.error('ユーザーデータの読み込みに失敗しました:', error)
+      console.error(`❌ ユーザーデータの読み込みに失敗: ${username}`, error)
       setUserProfile(createDefaultProfile(username))
     } finally {
       setLoading(false)
@@ -78,7 +88,14 @@ export default function UserPage() {
 
   const fetchSpotifyPreview = async (song: Song): Promise<Song> => {
     try {
-      const results = await spotifySearch.searchTracksAdvanced(song.title, song.artist)
+      // トークンを取得（ない場合はnullで検索スキップ）
+      const token = localStorage.getItem('spotify_access_token')
+      if (!token) {
+        console.log('Spotifyトークンがありません。検索をスキップします。')
+        return song
+      }
+      
+      const results = await spotifySearch.searchTracksAdvanced(song.title, song.artist, token)
       if (results.length > 0) {
         const track = results[0]
         return {
@@ -98,7 +115,7 @@ export default function UserPage() {
 
   const fetchYouTubePreview = async (song: Song): Promise<Song> => {
     try {
-      const results = await youtubeSearch(`${song.title} ${song.artist}`)
+      const results = await youtubeSearch.searchMusic(`${song.title} ${song.artist}`)
       if (results.length > 0) {
         const video = results[0]
         return {
@@ -404,7 +421,7 @@ export default function UserPage() {
                     previewUrl={selectedSong.spotify.previewUrl}
                     title={selectedSong.title}
                     artist={selectedSong.artist}
-                    spotifyUrl={selectedSong.spotify.spotifyUrl}
+                    coverImage={selectedSong.jacket || '/default-cover.jpg'}
                   />
                 </div>
               )}
@@ -414,6 +431,8 @@ export default function UserPage() {
                   <YouTubePlayer
                     videoId={selectedSong.youtube.videoId}
                     title={selectedSong.youtube.title}
+                    artist={selectedSong.artist}
+                    coverImage={selectedSong.jacket || '/default-cover.jpg'}
                   />
                 </div>
               )}
