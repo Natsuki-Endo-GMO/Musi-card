@@ -25,11 +25,48 @@ export default function UserPage() {
   const [showStats, setShowStats] = useState(false)
   const [showShare, setShowShare] = useState(false)
 
+  // ランダム配置のための楽曲インデックス配列を生成
+  const generateRandomSongPositions = (songs: Song[], gridLayout: any) => {
+    const totalCells = gridLayout.totalCells
+    const centerPositions = gridLayout.centerPositions || []
+    
+    // 中央以外の使用可能な位置を取得
+    const availablePositions: number[] = []
+    for (let i = 0; i < totalCells; i++) {
+      if (!centerPositions.includes(i)) {
+        availablePositions.push(i)
+      }
+    }
+    
+    // ランダムにシャッフル
+    const shuffledPositions = [...availablePositions].sort(() => Math.random() - 0.5)
+    
+    // 楽曲の数だけ位置を選択
+    const selectedPositions = shuffledPositions.slice(0, songs.length)
+    
+    // positionIndex -> songIndex のマッピングを作成
+    const positionToSongMap: { [key: number]: number } = {}
+    selectedPositions.forEach((position, songIndex) => {
+      positionToSongMap[position] = songIndex
+    })
+    
+    return positionToSongMap
+  }
+
+  const [songPositionMap, setSongPositionMap] = useState<{ [key: number]: number }>({})
+
   useEffect(() => {
     if (username) {
       loadUserData(username)
     }
   }, [username])
+
+  useEffect(() => {
+    if (userProfile && userProfile.songs && userProfile.gridLayout) {
+      const positionMap = generateRandomSongPositions(userProfile.songs, userProfile.gridLayout)
+      setSongPositionMap(positionMap)
+    }
+  }, [userProfile])
 
   const loadUserData = async (username: string) => {
     try {
@@ -322,18 +359,13 @@ export default function UserPage() {
               {Array.from({ length: userProfile.gridLayout?.totalCells || GRID_LAYOUTS[1].totalCells }).map((_, index) => {
                 const centerPositions = userProfile.gridLayout?.centerPositions || GRID_LAYOUTS[1].centerPositions
                 const isCenterCell = centerPositions.includes(index)
+                const isOddGrid = (userProfile.gridLayout?.size || GRID_LAYOUTS[1].size) % 2 === 1
                 
-                // 楽曲のインデックス計算（中央セルを除く）
-                let songIndex = -1
-                if (!isCenterCell) {
-                  // 現在のindexより前にある中央セルの数を計算
-                  const centerCellsBefore = centerPositions.filter(pos => pos < index).length
-                  songIndex = index - centerCellsBefore
-                }
+                // ランダム配置された楽曲を取得
+                const songIndex = songPositionMap[index]
+                const song = songIndex !== undefined ? userProfile.songs[songIndex] : null
                 
-                const song = songIndex >= 0 && songIndex < userProfile.songs.length ? userProfile.songs[songIndex] : null
-                
-                                // 4マス中央の場合、最初のセル以外はスキップ
+                // 4マス中央の場合、最初のセル以外はスキップ
                 if (isCenterCell && centerPositions.length === 4 && index !== centerPositions[0]) {
                   return null
                 }
@@ -356,21 +388,31 @@ export default function UserPage() {
                           <img 
                             src={userProfile.icon} 
                             alt={`${userProfile.displayName}のアイコン`}
-                            className="w-full h-full object-cover rounded-lg border-4 shadow-xl"
+                            className={`w-full h-full object-cover rounded-lg shadow-xl ${
+                              isOddGrid ? 'border-8' : 'border-4'
+                            }`}
                             style={{
                               borderColor: theme.primaryHex,
-                              boxShadow: `0 10px 25px -5px ${theme.primaryHex}30, 0 10px 10px -5px ${theme.primaryHex}20`
+                              boxShadow: isOddGrid 
+                                ? `0 15px 35px -5px ${theme.primaryHex}40, 0 15px 15px -5px ${theme.primaryHex}30, inset 0 0 0 2px ${theme.primaryHex}20`
+                                : `0 10px 25px -5px ${theme.primaryHex}30, 0 10px 10px -5px ${theme.primaryHex}20`
                             }}
                           />
                         ) : (
                           <div 
-                            className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/20 to-white/10 rounded-lg border-4 shadow-xl"
+                            className={`w-full h-full flex items-center justify-center bg-gradient-to-br from-white/20 to-white/10 rounded-lg shadow-xl ${
+                              isOddGrid ? 'border-8' : 'border-4'
+                            }`}
                             style={{
                               borderColor: theme.primaryHex,
-                              boxShadow: `0 10px 25px -5px ${theme.primaryHex}30, 0 10px 10px -5px ${theme.primaryHex}20`
+                              boxShadow: isOddGrid 
+                                ? `0 15px 35px -5px ${theme.primaryHex}40, 0 15px 15px -5px ${theme.primaryHex}30, inset 0 0 0 2px ${theme.primaryHex}20`
+                                : `0 10px 25px -5px ${theme.primaryHex}30, 0 10px 10px -5px ${theme.primaryHex}20`
                             }}
                           >
-                            <div className="text-white/60 text-4xl font-bold">
+                            <div className={`text-white/60 font-bold ${
+                              isOddGrid ? 'text-5xl' : 'text-4xl'
+                            }`}>
                               {userProfile.displayName.charAt(0).toUpperCase()}
                             </div>
                           </div>
@@ -407,15 +449,8 @@ export default function UserPage() {
                         </div>
                       </div>
                     ) : (
-                      /* 空のセル */
-                      <div className="w-full h-full bg-white/5 rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center">
-                        <div className="text-white/30 text-center">
-                          <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                          </svg>
-                          <p className="text-xs">空き</p>
-                        </div>
-                      </div>
+                      /* 空のセル - 完全な空白 */
+                      <div className="w-full h-full"></div>
                     )}
                   </div>
                 )
