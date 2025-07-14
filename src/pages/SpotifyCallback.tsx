@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { exchangeCodeForTokens, setMusicProvider } from '../services/musicSearch'
+import { spotifyAuth } from '../services/spotifyApi'
+import { setMusicProvider, setSpotifyAccessToken } from '../services/musicSearch'
 
 export default function SpotifyCallback() {
   const [searchParams] = useSearchParams()
@@ -42,16 +43,35 @@ export default function SpotifyCallback() {
           throw new Error('状態パラメータが見つかりません')
         }
 
+        // State検証（CSRF攻撃防止）
+        const savedState = localStorage.getItem('spotify_auth_state')
+        if (import.meta.env.PROD && savedState !== state) {
+          throw new Error('State parameter不一致 - セキュリティエラー')
+        }
+        
+        if (import.meta.env.DEV && savedState !== state) {
+          console.warn('⚠️ State parameter不一致 - 開発環境では続行します')
+          console.log('🔍 State検証デバッグ:')
+          console.log(`   受信したstate: "${state}"`)
+          console.log(`   保存されたstate: "${savedState}"`)
+        }
+
         console.log('🔄 認証コードをアクセストークンに交換中...')
 
-        // 認証コードをアクセストークンとリフレッシュトークンに交換
-        const tokenData = await exchangeCodeForTokens(code, state)
+        // 認証コードをアクセストークンに交換（PKCEフロー）
+        const accessToken = await spotifyAuth.getAccessToken(code)
+        
+        // アクセストークンを保存
+        setSpotifyAccessToken(accessToken)
+        
+        // 使用済みのstate情報をクリア
+        localStorage.removeItem('spotify_auth_state')
         
         // 音楽検索プロバイダーをSpotifyに設定
         setMusicProvider('spotify')
         
         setStatus('success')
-        setMessage(`Spotify認証が完了しました！アクセストークンの有効期限: ${Math.floor(tokenData.expires_in / 60)}分`)
+        setMessage(`Spotify認証が完了しました！PKCEフローによる安全な認証です。`)
 
         // URLから認証パラメータを削除（認証コードの再利用防止）
         window.history.replaceState({}, document.title, '/callback')
@@ -67,12 +87,13 @@ export default function SpotifyCallback() {
         setMessage(error.message || 'Spotify認証に失敗しました')
         
         // 詳細なエラー情報をコンソールに出力
-        if (error.message?.includes('Token exchange failed')) {
+        if (error.message?.includes('Token exchange failed') || error.message?.includes('Failed to get access token')) {
           console.error('🔍 トークン交換エラーの詳細:')
           console.error('   • 認証コードが既に使用済みの可能性')
-          console.error('   • Client IDまたはSecretが間違っている可能性')
+          console.error('   • Client IDが間違っている可能性')
           console.error('   • Redirect URIが正確に設定されていない可能性')
           console.error('   • 認証コードの有効期限（10分）が切れている可能性')
+          console.error('   • code_verifierが見つからない可能性')
         }
         
         if (error.message?.includes('Invalid authorization code')) {
@@ -120,7 +141,8 @@ export default function SpotifyCallback() {
               <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
                 <p className="text-green-700 text-sm">
                   ✅ 音楽検索でSpotifyが利用可能になりました<br/>
-                  ✅ リフレッシュトークンによる自動更新対応<br/>
+                  ✅ PKCEフローによる安全な認証を実現<br/>
+                  ✅ Client Secretが不要なセキュアな実装<br/>
                   ✅ より高精度な検索結果を提供<br/>
                   ✅ 認証コードの重複使用を防止
                 </p>
@@ -149,9 +171,10 @@ export default function SpotifyCallback() {
                   <strong>🔍 よくある解決方法:</strong><br/>
                   • 認証コードの重複使用（ページリロード等）<br/>
                   • Spotify Developer Dashboardでredirect_uriを確認<br/>
-                  • Client IDとSecretが正しく設定されているか確認<br/>
+                  • Client IDが正しく設定されているか確認<br/>
                   • ブラウザのキャッシュをクリアして再試行<br/>
-                  • 認証コードの有効期限（10分）内に処理を完了
+                  • 認証コードの有効期限（10分）内に処理を完了<br/>
+                  • code_verifierが失われた場合は新しい認証を開始
                 </p>
               </div>
               <button

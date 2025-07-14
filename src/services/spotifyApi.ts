@@ -82,6 +82,10 @@ export const spotifyAuth = {
     // code_verifierをlocalStorageに保存
     localStorage.setItem('spotify_code_verifier', codeVerifier);
     
+    // state生成とlocalStorageに保存
+    const state = generateRandomString(32);
+    localStorage.setItem('spotify_auth_state', state);
+    
     // デバッグ用ログ（開発環境のみ）
     if (import.meta.env.DEV) {
       console.log('🎵 Spotify Auth:', {
@@ -91,7 +95,8 @@ export const spotifyAuth = {
         hostname: typeof window !== 'undefined' ? window.location.hostname : 'SSR',
         protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown',
         port: typeof window !== 'undefined' ? window.location.port : 'unknown',
-        envVar: import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'not set'
+        envVar: import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'not set',
+        state: state
       });
     }
     
@@ -102,7 +107,7 @@ export const spotifyAuth = {
       scope: SCOPES,
       code_challenge_method: 'S256',
       code_challenge: codeChallenge,
-      state: generateRandomString(32)
+      state: state
     });
     return `${AUTH_ENDPOINT}?${params.toString()}`;
   },
