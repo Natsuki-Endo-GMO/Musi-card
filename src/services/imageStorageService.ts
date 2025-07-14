@@ -1,6 +1,13 @@
 import { put, del, list } from '@vercel/blob'
 import { processImage, validateImageSize, validateImageFormat, generateSafeFileName, IMAGE_PRESETS, ProcessedImage } from '../utils/imageProcessor'
 
+// Vercel Blob Storage設定
+const BLOB_READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || process.env.VITE_BLOB_READ_WRITE_TOKEN
+
+if (!BLOB_READ_WRITE_TOKEN) {
+  console.warn('⚠️ BLOB_READ_WRITE_TOKENが設定されていません。画像ストレージ機能が無効になります。')
+}
+
 export interface ImageUploadResult {
   url: string
   size: number
@@ -28,10 +35,23 @@ export class ImageStorageService {
   }
 
   /**
+   * Blob Storageが利用可能かチェック
+   */
+  private isBlobStorageAvailable(): boolean {
+    return !!BLOB_READ_WRITE_TOKEN
+  }
+
+  /**
    * ユーザーアイコンをアップロード
    */
   async uploadUserIcon(file: File, username: string): Promise<ImageUploadResult> {
     try {
+      // Blob Storageが利用できない場合はフォールバック
+      if (!this.isBlobStorageAvailable()) {
+        console.warn('⚠️ Blob Storageが利用できません。ローカル保存を使用します。')
+        return this.fallbackUpload(file, username, 'icon')
+      }
+
       // バリデーション
       if (!validateImageFormat(file.type)) {
         throw new Error('サポートされていない画像形式です')
@@ -69,7 +89,8 @@ export class ImageStorageService {
       }
     } catch (error) {
       console.error('ユーザーアイコンアップロードエラー:', error)
-      throw error
+      // エラーの場合はフォールバック
+      return this.fallbackUpload(file, username, 'icon')
     }
   }
 
@@ -78,6 +99,12 @@ export class ImageStorageService {
    */
   async uploadAlbumCover(file: File, username: string, songId: string): Promise<ImageUploadResult> {
     try {
+      // Blob Storageが利用できない場合はフォールバック
+      if (!this.isBlobStorageAvailable()) {
+        console.warn('⚠️ Blob Storageが利用できません。ローカル保存を使用します。')
+        return this.fallbackUpload(file, username, 'album')
+      }
+
       // バリデーション
       if (!validateImageFormat(file.type)) {
         throw new Error('サポートされていない画像形式です')
@@ -115,7 +142,8 @@ export class ImageStorageService {
       }
     } catch (error) {
       console.error('アルバムジャケットアップロードエラー:', error)
-      throw error
+      // エラーの場合はフォールバック
+      return this.fallbackUpload(file, username, 'album')
     }
   }
 
@@ -124,6 +152,12 @@ export class ImageStorageService {
    */
   async uploadFromUrl(imageUrl: string, username: string, type: 'icon' | 'album'): Promise<ImageUploadResult> {
     try {
+      // Blob Storageが利用できない場合はフォールバック
+      if (!this.isBlobStorageAvailable()) {
+        console.warn('⚠️ Blob Storageが利用できません。元のURLを返します。')
+        return this.fallbackUrlUpload(imageUrl, username, type)
+      }
+
       // 外部URLから画像を取得
       const response = await fetch(imageUrl)
       if (!response.ok) {
@@ -157,7 +191,41 @@ export class ImageStorageService {
       }
     } catch (error) {
       console.error('外部画像アップロードエラー:', error)
-      throw error
+      // エラーの場合はフォールバック
+      return this.fallbackUrlUpload(imageUrl, username, type)
+    }
+  }
+
+  /**
+   * フォールバックアップロード（ローカル保存）
+   */
+  private async fallbackUpload(file: File, username: string, type: 'icon' | 'album'): Promise<ImageUploadResult> {
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string
+        resolve({
+          url: dataUrl,
+          size: file.size,
+          width: 0,
+          height: 0,
+          format: file.type.split('/')[1] || 'jpeg'
+        })
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
+  /**
+   * フォールバックURLアップロード（元のURLを返す）
+   */
+  private async fallbackUrlUpload(imageUrl: string, username: string, type: 'icon' | 'album'): Promise<ImageUploadResult> {
+    return {
+      url: imageUrl,
+      size: 0,
+      width: 0,
+      height: 0,
+      format: 'jpeg'
     }
   }
 
@@ -166,6 +234,12 @@ export class ImageStorageService {
    */
   async deleteImage(url: string): Promise<boolean> {
     try {
+      // Blob Storageが利用できない場合はスキップ
+      if (!this.isBlobStorageAvailable()) {
+        console.warn('⚠️ Blob Storageが利用できません。削除をスキップします。')
+        return true
+      }
+
       await del(url)
       console.log(`🗑️ 画像を削除: ${url}`)
       return true
@@ -180,6 +254,12 @@ export class ImageStorageService {
    */
   async getUserImages(username: string): Promise<string[]> {
     try {
+      // Blob Storageが利用できない場合は空配列を返す
+      if (!this.isBlobStorageAvailable()) {
+        console.warn('⚠️ Blob Storageが利用できません。画像一覧を取得できません。')
+        return []
+      }
+
       const { blobs } = await list({
         prefix: `${username}/`,
         limit: 100
@@ -197,6 +277,17 @@ export class ImageStorageService {
    */
   async getStorageStats(): Promise<ImageStorageStats> {
     try {
+      // Blob Storageが利用できない場合はデフォルト値を返す
+      if (!this.isBlobStorageAvailable()) {
+        console.warn('⚠️ Blob Storageが利用できません。統計情報を取得できません。')
+        return {
+          totalFiles: 0,
+          totalSize: 0,
+          userIcons: 0,
+          albumCovers: 0
+        }
+      }
+
       const { blobs } = await list({
         limit: 1000
       })
@@ -236,6 +327,12 @@ export class ImageStorageService {
    */
   async cleanupOldImages(): Promise<number> {
     try {
+      // Blob Storageが利用できない場合はスキップ
+      if (!this.isBlobStorageAvailable()) {
+        console.warn('⚠️ Blob Storageが利用できません。クリーンアップをスキップします。')
+        return 0
+      }
+
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 

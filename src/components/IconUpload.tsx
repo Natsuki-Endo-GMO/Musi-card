@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { imageStorageService } from '../services/imageStorageService'
 
 interface IconUploadProps {
   onIconChange: (iconUrl: string) => void
   currentIcon?: string
   className?: string
+  username?: string // ユーザー名を追加
 }
 
 interface CropArea {
@@ -13,7 +15,7 @@ interface CropArea {
   size: number
 }
 
-export default function IconUpload({ onIconChange, currentIcon, className = '' }: IconUploadProps) {
+export default function IconUpload({ onIconChange, currentIcon, className = '', username = '' }: IconUploadProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [cropArea, setCropArea] = useState<CropArea>({ x: 20, y: 20, size: 60 })
   const [isCropping, setIsCropping] = useState(false)
@@ -23,6 +25,7 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
   const [isResizing, setIsResizing] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [resizeStart, setResizeStart] = useState({ size: 0, mouseX: 0, mouseY: 0 })
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -97,6 +100,7 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
       setSelectedImage(result)
       setIsCropping(true)
       setCropArea({ x: 25, y: 25, size: 50 }) // デフォルト位置
+      setUploadError(null)
     }
     reader.readAsDataURL(file)
   }
@@ -252,6 +256,8 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
     if (!imageRef.current) return
 
     setIsUploading(true)
+    setUploadError(null)
+    
     try {
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
@@ -293,13 +299,30 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
       )
 
       // 画質を少し下げて処理速度を向上（0.85でも十分高品質）
-      const croppedImageUrl = canvas.toDataURL('image/jpeg', 0.85)
-      onIconChange(croppedImageUrl)
+      const croppedImageBlob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob)
+        }, 'image/jpeg', 0.85)
+      })
+
+      // 画像ストレージサービスを使用してアップロード
+      if (username) {
+        const file = new File([croppedImageBlob], 'icon.jpg', { type: 'image/jpeg' })
+        const result = await imageStorageService.uploadUserIcon(file, username)
+        onIconChange(result.url)
+        console.log('✅ アイコンをストレージにアップロードしました:', result.url)
+      } else {
+        // フォールバック: データURLを使用
+        const croppedImageUrl = canvas.toDataURL('image/jpeg', 0.85)
+        onIconChange(croppedImageUrl)
+        console.log('⚠️ ユーザー名が設定されていないため、ローカル保存を使用')
+      }
+
       setSelectedImage(null)
       setIsCropping(false)
     } catch (error) {
       console.error('トリミングエラー:', error)
-      alert('トリミング中にエラーが発生しました')
+      setUploadError('画像のアップロードに失敗しました。もう一度お試しください。')
     } finally {
       setIsUploading(false)
     }
@@ -322,7 +345,17 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
   }
 
   // アイコン削除
-  const handleRemoveIcon = () => {
+  const handleRemoveIcon = async () => {
+    if (currentIcon && username) {
+      try {
+        // ストレージから削除を試行
+        await imageStorageService.deleteImage(currentIcon)
+        console.log('🗑️ アイコンをストレージから削除しました')
+      } catch (error) {
+        console.warn('アイコン削除エラー（無視）:', error)
+      }
+    }
+    
     onIconChange('')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -400,8 +433,15 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
             </button>
           </div>
 
+          {/* エラーメッセージ */}
+          {uploadError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{uploadError}</p>
+            </div>
+          )}
+
           {/* デバッグ情報パネル */}
-          {(() => {
+          {process.env.NODE_ENV === 'development' && (() => {
             const imageSize = getCurrentImageSize()
             const naturalSize = imageRef.current ? {
               width: imageRef.current.naturalWidth,
@@ -434,53 +474,16 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
                 <div>
                   実際幅: {cropAreaRef.current ? cropAreaRef.current.offsetWidth : 0}px
                 </div>
-                <div>
-                  実際高: {cropAreaRef.current ? cropAreaRef.current.offsetHeight : 0}px
-                </div>
-                <div>
-                  実際縦横比: {cropAreaRef.current ? 
-                    (cropAreaRef.current.offsetWidth / cropAreaRef.current.offsetHeight).toFixed(2) : 
-                    'N/A'
-                  }
-                </div>
-                <div>制限値: {Math.round(debugMinSize)}px</div>
                 <br />
-                マスク情報
-                <div>
-                  {(() => {
-                    const imageSize = getCurrentImageSize()
-                    const squareSize = (cropArea.size / 100) * Math.min(imageSize.width, imageSize.height)
-                    const cropLeft = (cropArea.x / 100) * imageSize.width
-                    const cropTop = (cropArea.y / 100) * imageSize.height
-                    const centerX = ((cropLeft + squareSize / 2) / imageSize.width) * 100
-                    const centerY = ((cropTop + squareSize / 2) / imageSize.height) * 100
-                    const minImageSize = Math.min(imageSize.width, imageSize.height)
-                    const radiusX = (squareSize / 2 / imageSize.width) * 100
-                    const radiusY = (squareSize / 2 / imageSize.height) * 100
-                    const radiusPercent = Math.min(radiusX, radiusY)
-                    const maskStyle = `radial-gradient(circle ${radiusPercent}% at ${centerX}% ${centerY}%, transparent 98%, black 100%)`
-                    console.log('Mask debug:', { centerX, centerY, radiusPercent, imageSize, squareSize })
-                    return `中心: ${centerX.toFixed(1)}%, ${centerY.toFixed(1)}% | 半径: ${radiusPercent.toFixed(1)}%`
-                  })()}
-                </div>
-                <br />
-                トリミング予定範囲
-                <div>
-                  {(() => {
-                    if (!imageRef.current) return 'N/A'
-                    const scaleX = imageRef.current.naturalWidth / imageRef.current.width
-                    const scaleY = imageRef.current.naturalHeight / imageRef.current.height
-                    const displayMinSize = Math.min(imageRef.current.width, imageRef.current.height)
-                    const cropSize = (cropArea.size / 100) * displayMinSize
-                    const actualCropSize = cropSize * Math.min(scaleX, scaleY)
-                    return `最終出力: ${Math.round(actualCropSize)}px × ${Math.round(actualCropSize)}px`
-                  })()}
-                </div>
+                ストレージ情報
+                <div>ユーザー名: {username || '未設定'}</div>
+                <div>アップロード中: {isUploading ? 'Yes' : 'No'}</div>
               </div>
             )
           })()}
-          
-          <div className={`mb-6 ${isMobile ? 'flex-1 flex items-center justify-center' : ''}`}>
+
+          {/* トリミングエリア */}
+          <div className="mb-6">
             <div 
               ref={containerRef}
               className={`relative inline-block ${
@@ -662,7 +665,7 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
                       title={`正方形サイズ: ${Math.round(squareSize)}px × ${Math.round(squareSize)}px`}
                     >
                       {/* グリッドライン（3x3） */}
-                      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 11 }}>
+                      <div className="relative w-full h-full">
                         {/* 縦線 */}
                         <div className={`absolute ${isMobile ? 'border-l-2' : 'border-l'} border-white opacity-50`} style={{
                           left: '33.333%',
@@ -691,7 +694,7 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
                       <div className={`absolute -top-1 -left-1 ${isMobile ? 'w-4 h-4' : 'w-3 h-3'} bg-white border border-gray-400`} style={{ zIndex: 15 }} />
                       <div className={`absolute -top-1 -right-1 ${isMobile ? 'w-4 h-4' : 'w-3 h-3'} bg-white border border-gray-400`} style={{ zIndex: 15 }} />
                       <div className={`absolute -bottom-1 -left-1 ${isMobile ? 'w-4 h-4' : 'w-3 h-3'} bg-white border border-gray-400`} style={{ zIndex: 15 }} />
-                      <div className={`absolute -bottom-1 -right-1 ${isMobile ? 'w-4 h-4' : 'w-3 h-3'} bg-white border border-gray-400`} style={{ zIndex: 15 }} />
+                      
                       
                       {/* リサイズハンドル（右下、より目立つデザイン） */}
                       <div 
@@ -729,7 +732,7 @@ export default function IconUpload({ onIconChange, currentIcon, className = '' }
               className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 font-medium"
               disabled={isUploading}
             >
-              {isUploading ? '処理中...' : '適用'}
+              {isUploading ? 'アップロード中...' : '適用'}
             </button>
           </div>
         </div>

@@ -6,6 +6,7 @@ import MusicSearchAutocomplete from '../components/MusicSearchAutocomplete'
 import IconUpload from '../components/IconUpload'
 import Toast from '../components/Toast'
 import { SearchResult } from '../services/musicSearch'
+import ImageStorageDebug from '../components/ImageStorageDebug'
 
 interface ToastState {
   message: string
@@ -211,6 +212,9 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* デバッグコンポーネント（開発環境のみ） */}
+        {process.env.NODE_ENV === 'development' && <ImageStorageDebug />}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* 左側：プロフィール編集 */}
           <div className="space-y-6">
@@ -229,6 +233,7 @@ export default function Dashboard() {
                       ...userProfile,
                       icon: iconUrl
                     })}
+                    username={currentUser}
                   />
                 </div>
 
@@ -502,6 +507,7 @@ export default function Dashboard() {
               <MusicSearchAutocomplete
                 onSelect={handleMusicSelect}
                 placeholder="楽曲名やアーティスト名で検索..."
+                username={currentUser}
               />
             </div>
           </div>

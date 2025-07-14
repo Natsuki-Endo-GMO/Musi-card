@@ -238,6 +238,7 @@ export default function CreateUser() {
                 <IconUpload 
                   currentIcon={userProfile.icon} 
                   onIconChange={(icon) => setUserProfile(prev => ({ ...prev, icon }))}
+                  username={userProfile.username}
                 />
               </div>
 
@@ -436,10 +437,11 @@ export default function CreateUser() {
                       </button>
                     </div>
                     
-                                         <MusicSearchAutocomplete
-                       onSelect={(result) => handleMusicSelect(index, result)}
-                       placeholder="曲名やアーティスト名を検索..."
-                     />
+                                                             <MusicSearchAutocomplete
+                      onSelect={(result) => handleMusicSelect(index, result)}
+                      placeholder="曲名やアーティスト名を検索..."
+                      username={userProfile.username}
+                    />
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                       <div>

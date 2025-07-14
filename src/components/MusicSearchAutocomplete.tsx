@@ -1,248 +1,174 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { searchMusicWithFallback, SearchResult, getLastSearchStatus, getCurrentProvider } from '../services/musicSearch'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { searchMusic } from '../services/musicSearch'
+import { SearchResult } from '../services/musicSearch'
+import { externalImageCacheService } from '../services/externalImageCacheService'
 
 interface MusicSearchAutocompleteProps {
-  onSelect: (result: SearchResult) => void
+  onSelect: (music: SearchResult) => void
   placeholder?: string
   className?: string
+  username?: string // ユーザー名を追加
 }
 
 export default function MusicSearchAutocomplete({ 
   onSelect, 
   placeholder = "曲名やアーティスト名を検索...",
-  className = ""
+  className = "",
+  username = ""
 }: MusicSearchAutocompleteProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
-  const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [error, setError] = useState<string | null>(null)
   const [showErrorDetails, setShowErrorDetails] = useState(false)
-  const [lastSearchTime, setLastSearchTime] = useState<number>(0)
+  const [lastSearchTime, setLastSearchTime] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const searchTimeoutRef = useRef<NodeJS.Timeout>()
 
-  // 検索の実行（自動・手動共通）
-  const performSearch = async (searchQuery: string, isManual: boolean = false) => {
-    if (searchQuery.trim().length < 1) {
+  // 検索実行
+  const performSearch = useCallback(async (searchQuery: string) => {
+    if (searchQuery.trim().length < 2) {
       setResults([])
       setShowDropdown(false)
       return
     }
 
     setIsLoading(true)
-    setLastSearchTime(Date.now())
-    
+    setError(null)
+    setShowErrorDetails(false)
+
     try {
-      const searchResults = await searchMusicWithFallback(searchQuery)
-      setResults(searchResults)
-      setShowDropdown(searchResults.length > 0)
-      setSelectedIndex(-1)
+      const searchResults = await searchMusic(searchQuery)
       
-      // 手動検索の場合は常にエラー詳細を表示
-      if (isManual) {
-        setShowErrorDetails(true)
-        
-        // 検索状況をコンソールに詳細表示
-        const searchStatus = getLastSearchStatus()
-        const currentProvider = getCurrentProvider()
-        
-        console.group(`🔍 手動検索結果詳細 (${new Date().toLocaleTimeString()})`)
-        console.log(`📝 検索クエリ: "${searchQuery}"`)
-        console.log(`⚙️ 現在のプロバイダー: ${currentProvider.toUpperCase()}`)
-        console.log(`📊 検索結果数: ${searchResults.length}件`)
-        
-        if (searchStatus.length > 0) {
-          console.log('📋 検索状況:')
-          searchStatus.forEach((status, index) => {
-            const statusIcon = status.success ? '✅' : '❌'
-            console.log(`  ${index + 1}. ${statusIcon} ${status.provider.toUpperCase()}`)
-            if (status.error) {
-              console.log(`     エラー: ${status.error}`)
-            }
-            if (status.fallbackReason) {
-              console.log(`     フォールバック理由: ${status.fallbackReason}`)
-            }
+      // 画像キャッシュ処理
+      if (username && searchResults.length > 0) {
+        const cachedResults = await Promise.all(
+          searchResults.map(async (result) => {
+                         if (result.image && result.image.startsWith('http')) {
+               try {
+                 const cachedImageUrl = await externalImageCacheService.cacheExternalImage(
+                   result.image,
+                   username,
+                   'album',
+                   'manual'
+                 )
+                 return {
+                   ...result,
+                   image: cachedImageUrl
+                 }
+               } catch (error) {
+                 console.warn('画像キャッシュエラー:', error)
+                 // キャッシュに失敗しても元の画像URLを使用
+                 return result
+               }
+             }
+            return result
           })
-          
-          // フォールバック理由をまとめて表示
-          const failedProviders = searchStatus.filter(s => !s.success)
-          if (failedProviders.length > 0) {
-            console.warn('⚠️ フォールバック詳細:')
-            failedProviders.forEach(status => {
-              if (status.fallbackReason) {
-                console.warn(`  • ${status.provider.toUpperCase()}: ${status.fallbackReason}`)
-              }
-            })
-          }
-        }
-        console.groupEnd()
+        )
+        setResults(cachedResults)
+      } else {
+        setResults(searchResults)
       }
       
+      setShowDropdown(true)
+      setSelectedIndex(0)
     } catch (error) {
-      console.error('🔍 検索エラー:', error)
+      console.error('音楽検索エラー:', error)
+      setError(error instanceof Error ? error.message : '検索中にエラーが発生しました')
       setResults([])
       setShowDropdown(false)
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [username])
 
-  // 自動検索（デバウンス付き）
-  useEffect(() => {
-    if (query.trim().length < 2) {
-      setResults([])
-      setShowDropdown(false)
+  // 手動検索
+  const handleManualSearch = useCallback(() => {
+    const now = Date.now()
+    if (now - lastSearchTime < 1000) {
+      console.log('検索間隔が短すぎます')
       return
     }
+    setLastSearchTime(now)
+    performSearch(query.trim())
+  }, [query, lastSearchTime, performSearch])
 
-    // デバウンス処理
-    const timeoutId = setTimeout(() => {
-      performSearch(query, false)
-    }, 300)
-    
-    return () => clearTimeout(timeoutId)
-  }, [query])
-
-  // 手動検索ボタンのハンドラ
-  const handleManualSearch = () => {
-    if (query.trim().length >= 1) {
-      performSearch(query, true)
+  // 自動検索（デバウンス）
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
     }
-  }
 
-  // エラー詳細の表示・非表示切り替え
-  const toggleErrorDetails = () => {
-    setShowErrorDetails(!showErrorDetails)
-    
-    if (!showErrorDetails) {
-      // エラー詳細を表示する際に現在の検索状況をコンソールに出力
-      const searchStatus = getLastSearchStatus()
-      const currentProvider = getCurrentProvider()
-      
-      console.group(`📊 現在の検索状況詳細`)
-      console.log(`⚙️ アクティブプロバイダー: ${currentProvider.toUpperCase()}`)
-      
-      if (searchStatus.length > 0) {
-        console.log('📋 最新の検索履歴:')
-        searchStatus.forEach((status, index) => {
-          const statusIcon = status.success ? '✅' : '❌'
-          const timeStr = new Date(status.timestamp).toLocaleTimeString()
-          console.log(`  ${index + 1}. ${statusIcon} ${status.provider.toUpperCase()} (${timeStr})`)
-          if (status.error) {
-            console.log(`     エラー: ${status.error}`)
-          }
-          if (status.fallbackReason) {
-            console.log(`     理由: ${status.fallbackReason}`)
-          }
-        })
-      } else {
-        console.log('まだ検索が実行されていません')
+    if (query.trim().length >= 2) {
+      searchTimeoutRef.current = setTimeout(() => {
+        performSearch(query)
+      }, 500)
+    } else {
+      setResults([])
+      setShowDropdown(false)
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
       }
-      console.groupEnd()
     }
-  }
-
-  // エラー詳細を表示するためのコンポーネント
-  const ErrorDetails = () => {
-    const searchStatus = getLastSearchStatus()
-    const currentProvider = getCurrentProvider()
-    
-    if (searchStatus.length === 0) return null
-
-    return (
-      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-        <div className="flex items-center justify-between mb-2">
-          <span className="font-medium text-blue-900">検索状況詳細</span>
-          <span className="text-blue-600 text-xs">現在: {currentProvider.toUpperCase()}</span>
-        </div>
-        
-        {searchStatus.map((status, index) => (
-          <div key={index} className="mb-1 last:mb-0">
-            <div className="flex items-center gap-2">
-              <span className={status.success ? 'text-green-600' : 'text-red-600'}>
-                {status.success ? '✅' : '❌'}
-              </span>
-              <span className="font-medium text-blue-800">
-                {status.provider.toUpperCase()}
-              </span>
-              <span className="text-blue-500 text-xs">
-                {new Date(status.timestamp).toLocaleTimeString()}
-              </span>
-            </div>
-            
-            {status.error && (
-              <div className="ml-6 text-red-600 text-xs">
-                エラー: {status.error}
-              </div>
-            )}
-            
-            {status.fallbackReason && (
-              <div className="ml-6 text-orange-600 text-xs">
-                {status.fallbackReason}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    )
-  }
+  }, [query, performSearch])
 
   // キーボードナビゲーション
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!showDropdown) return
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!showDropdown || results.length === 0) return
 
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault()
-        setSelectedIndex(prev => 
-          prev < results.length - 1 ? prev + 1 : prev
-        )
+        setSelectedIndex(prev => (prev + 1) % results.length)
         break
       case 'ArrowUp':
         e.preventDefault()
-        setSelectedIndex(prev => prev > 0 ? prev - 1 : -1)
+        setSelectedIndex(prev => (prev - 1 + results.length) % results.length)
         break
       case 'Enter':
         e.preventDefault()
-        if (selectedIndex >= 0 && results[selectedIndex]) {
+        if (results[selectedIndex]) {
           handleSelect(results[selectedIndex])
         }
         break
       case 'Escape':
         setShowDropdown(false)
-        setSelectedIndex(-1)
         break
     }
-  }
+  }, [showDropdown, results, selectedIndex])
 
-  // 結果の選択
-  const handleSelect = (result: SearchResult) => {
+  // 選択処理
+  const handleSelect = useCallback((result: SearchResult) => {
     onSelect(result)
     setQuery('')
     setResults([])
     setShowDropdown(false)
-    setSelectedIndex(-1)
-    inputRef.current?.blur()
-  }
+    setSelectedIndex(0)
+    setError(null)
+  }, [onSelect])
 
-  // クリックアウトサイドでドロップダウンを閉じる
+  // ドロップダウン外クリックで閉じる
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current && 
-        !dropdownRef.current.contains(event.target as Node) &&
-        inputRef.current && 
-        !inputRef.current.contains(event.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false)
-        setSelectedIndex(-1)
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // エラー詳細表示
+  const toggleErrorDetails = () => {
+    setShowErrorDetails(!showErrorDetails)
+  }
 
   return (
     <div className={`relative ${className}`}>
@@ -278,29 +204,41 @@ export default function MusicSearchAutocomplete({
           </button>
           
           {/* エラー詳細表示ボタン */}
-          {lastSearchTime > 0 && (
+          {error && (
             <button
               type="button"
               onClick={toggleErrorDetails}
-              className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors duration-200"
-              title="検索状況詳細を表示"
+              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors duration-200"
+              title="エラー詳細を表示"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </button>
           )}
         </div>
       </div>
 
-      {/* エラー詳細表示 */}
-      {showErrorDetails && <ErrorDetails />}
+      {/* エラーメッセージ */}
+      {error && (
+        <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-600">{error}</p>
+          {showErrorDetails && (
+            <div className="mt-2 p-2 bg-red-100 rounded text-xs text-red-700">
+              <p>詳細情報:</p>
+              <p>• インターネット接続を確認してください</p>
+              <p>• 検索キーワードを変更してみてください</p>
+              <p>• しばらく時間をおいてから再試行してください</p>
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* ドロップダウン */}
-      {showDropdown && (
-        <div
+      {/* 検索結果ドロップダウン */}
+      {showDropdown && results.length > 0 && (
+        <div 
           ref={dropdownRef}
-          className="absolute z-50 w-full mt-1 bg-white border border-blue-200 rounded-lg shadow-xl max-h-80 overflow-y-auto"
+          className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto"
         >
           {results.map((result, index) => (
             <div
@@ -337,37 +275,30 @@ export default function MusicSearchAutocomplete({
                     {result.provider === 'spotify' ? 'S' : 'L'}
                   </div>
                 )}
+                {/* キャッシュインジケーター */}
+                {username && result.image && result.image.includes('blob.vercel-storage.com') && (
+                  <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs px-1 py-0.5 rounded-full">
+                    C
+                  </div>
+                )}
               </div>
               
               {/* 曲情報 */}
               <div className="flex-1 min-w-0">
-                <div className={`font-medium truncate ${
-                  index === selectedIndex ? 'text-white' : 'text-blue-900'
-                }`}>
-                  {result.name}
-                </div>
-                <div className={`text-sm truncate ${
-                  index === selectedIndex ? 'text-blue-100' : 'text-blue-600'
-                }`}>
-                  {result.artist}
-                </div>
+                <div className="font-medium truncate">{result.name}</div>
+                <div className="text-sm opacity-75 truncate">{result.artist}</div>
               </div>
               
               {/* 選択インジケーター */}
               {index === selectedIndex && (
-                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
+                <div className="flex-shrink-0 ml-2">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
               )}
             </div>
           ))}
-          
-          {/* 結果が見つからない場合 */}
-          {results.length === 0 && query.trim().length >= 2 && !isLoading && (
-            <div className="p-4 text-center text-blue-600">
-              検索結果が見つかりませんでした
-            </div>
-          )}
         </div>
       )}
     </div>

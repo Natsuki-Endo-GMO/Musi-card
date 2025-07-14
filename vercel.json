@@ -1,26 +1,15 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "nodejs18.x"
     }
-  ],
-  "headers": [
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
+  },
+  "env": {
+    "BLOB_READ_WRITE_TOKEN": "@blob-read-write-token"
+  },
+  "build": {
+    "env": {
+      "BLOB_READ_WRITE_TOKEN": "@blob-read-write-token"
     }
-  ]
+  }
 } 
