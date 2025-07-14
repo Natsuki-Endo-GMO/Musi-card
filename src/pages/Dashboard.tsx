@@ -45,7 +45,7 @@ export default function Dashboard() {
           username,
           displayName: username,
           bio: '',
-          themeColor: THEME_COLORS[0],
+          themeColor: THEME_COLORS[0], // 白ベーステーマをデフォルトに
           socialLinks: {},
           favoriteGenres: [],
           songs: [],

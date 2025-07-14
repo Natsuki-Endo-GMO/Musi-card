@@ -78,6 +78,15 @@ export interface UserStats {
 // テーマカラーの選択肢
 export const THEME_COLORS: ThemeColor[] = [
   {
+    id: 'white',
+    name: 'ホワイト',
+    gradient: 'from-gray-50 to-gray-100',
+    primary: 'gray-600',
+    secondary: 'gray-100',
+    primaryHex: '#4B5563',
+    secondaryHex: '#F3F4F6'
+  },
+  {
     id: 'blue',
     name: 'ブルー',
     gradient: 'from-blue-500 to-blue-600',
