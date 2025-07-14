@@ -4,7 +4,13 @@ import { UserProfile, Song, ThemeColor, THEME_COLORS, GRID_LAYOUTS } from '../ty
 import { storageService } from '../services/storageService'
 import MusicSearchAutocomplete from '../components/MusicSearchAutocomplete'
 import IconUpload from '../components/IconUpload'
+import Toast from '../components/Toast'
 import { SearchResult } from '../services/musicSearch'
+
+interface ToastState {
+  message: string
+  type: 'success' | 'error' | 'info'
+}
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -12,6 +18,7 @@ export default function Dashboard() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState<ToastState | null>(null)
 
   useEffect(() => {
     checkAuth()
@@ -73,13 +80,22 @@ export default function Dashboard() {
       
       if (success) {
         console.log('✅ プロフィールを保存しました')
-        // TODO: 成功トーストを表示
+        setToast({
+          message: 'プロフィールを保存しました！',
+          type: 'success'
+        })
       } else {
-        alert('❌ 保存に失敗しました')
+        setToast({
+          message: '保存に失敗しました',
+          type: 'error'
+        })
       }
     } catch (error) {
       console.error('保存エラー:', error)
-      alert('❌ 保存中にエラーが発生しました')
+      setToast({
+        message: '保存中にエラーが発生しました',
+        type: 'error'
+      })
     } finally {
       setSaving(false)
     }
@@ -243,25 +259,48 @@ export default function Dashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
                     テーマカラー
                   </label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <p className="text-sm text-gray-600 mb-4">
+                    音楽名刺の配色テーマを選択してください。アイコンの枠線やボタンの色に反映されます。
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {THEME_COLORS.map((theme) => (
-                      <button
-                        key={theme.id}
-                        onClick={() => setUserProfile({
-                          ...userProfile,
-                          themeColor: theme
-                        })}
-                        className={`p-3 rounded-lg text-white text-xs font-medium transition-all bg-gradient-to-br ${theme.gradient} ${
+                      <label key={theme.id} className="cursor-pointer">
+                        <input
+                          type="radio"
+                          name="themeColor"
+                          checked={userProfile.themeColor.id === theme.id}
+                          onChange={() => setUserProfile({
+                            ...userProfile,
+                            themeColor: theme
+                          })}
+                          className="sr-only"
+                        />
+                        <div className={`relative p-3 rounded-xl border-2 transition-all ${
                           userProfile.themeColor.id === theme.id
-                            ? 'ring-2 ring-gray-400 scale-105'
-                            : 'hover:scale-105'
-                        }`}
-                      >
-                        {theme.name}
-                      </button>
+                            ? 'border-gray-400 ring-2 ring-blue-500/20 shadow-lg scale-105'
+                            : 'border-gray-200 hover:border-gray-300 hover:scale-102'
+                        }`}>
+                          {/* カラープレビュー */}
+                          <div className={`w-full h-8 rounded-lg bg-gradient-to-r ${theme.gradient} mb-2 shadow-sm`}></div>
+                          
+                          {/* テーマ名 */}
+                          <p className="text-center text-sm font-medium text-gray-800">{theme.name}</p>
+                          
+                          {/* 選択中インジケーター */}
+                          {userProfile.themeColor.id === theme.id && (
+                            <div className="absolute top-2 right-2">
+                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </label>
                     ))}
                   </div>
                 </div>
@@ -413,6 +452,15 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      
+      {/* トースト通知 */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   )
 } 

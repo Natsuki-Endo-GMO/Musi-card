@@ -200,14 +200,20 @@ export default function UserPage() {
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
       {/* 背景グラデーション */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradient} opacity-20`}></div>
+      <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradient} opacity-30`}></div>
       
       <div className="relative z-10">
         {/* ヘッダー */}
         <div className="flex items-center justify-between p-6">
           <button
             onClick={() => navigate('/')}
-            className="flex items-center text-white hover:text-gray-300 transition-colors"
+            className="flex items-center text-white transition-all px-3 py-2 rounded-lg hover:bg-white/10"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = theme.primaryHex
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'white'
+            }}
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -219,7 +225,7 @@ export default function UserPage() {
             {isPreviewMode && (
               <button
                 onClick={() => navigate('/dashboard')}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+                className={`px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r ${theme.gradient} text-white hover:opacity-90 transition-all shadow-lg`}
               >
                 編集画面に戻る
               </button>
@@ -230,23 +236,49 @@ export default function UserPage() {
               <>
                 <button
                   onClick={() => setShowStats(!showStats)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     showStats 
-                      ? 'bg-white text-black' 
-                      : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
+                      ? `bg-gradient-to-r ${theme.gradient} text-white shadow-lg` 
+                      : 'bg-white/10 text-white border hover:border-transparent'
                   }`}
+                  style={!showStats ? {
+                    borderColor: theme.primaryHex + '50'
+                  } as React.CSSProperties : {}}
+                  onMouseEnter={(e) => {
+                    if (!showStats) {
+                      e.currentTarget.style.background = `linear-gradient(to right, ${theme.primaryHex}, ${theme.primaryHex})`
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!showStats) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                    }
+                  }}
                 >
                   統計
                 </button>
                 <button
                   onClick={() => setShowShare(!showShare)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                showShare 
-                  ? 'bg-white text-black' 
-                  : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
-              }`}
-            >
-              共有
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    showShare 
+                      ? `bg-gradient-to-r ${theme.gradient} text-white shadow-lg` 
+                      : 'bg-white/10 text-white border hover:border-transparent'
+                  }`}
+                  style={!showShare ? {
+                    borderColor: theme.primaryHex + '50'
+                  } as React.CSSProperties : {}}
+                  onMouseEnter={(e) => {
+                    if (!showShare) {
+                      e.currentTarget.style.background = `linear-gradient(to right, ${theme.primaryHex}, ${theme.primaryHex})`
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!showShare) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                    }
+                  }}
+                >
+                  共有
                 </button>
               </>
             )}
@@ -324,10 +356,20 @@ export default function UserPage() {
                           <img 
                             src={userProfile.icon} 
                             alt={`${userProfile.displayName}のアイコン`}
-                            className="w-full h-full object-cover rounded-lg border-2 border-white/30 shadow-xl"
+                            className="w-full h-full object-cover rounded-lg border-4 shadow-xl"
+                            style={{
+                              borderColor: theme.primaryHex,
+                              boxShadow: `0 10px 25px -5px ${theme.primaryHex}30, 0 10px 10px -5px ${theme.primaryHex}20`
+                            }}
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/20 to-white/10 rounded-lg border-2 border-white/30">
+                          <div 
+                            className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/20 to-white/10 rounded-lg border-4 shadow-xl"
+                            style={{
+                              borderColor: theme.primaryHex,
+                              boxShadow: `0 10px 25px -5px ${theme.primaryHex}30, 0 10px 10px -5px ${theme.primaryHex}20`
+                            }}
+                          >
                             <div className="text-white/60 text-4xl font-bold">
                               {userProfile.displayName.charAt(0).toUpperCase()}
                             </div>
