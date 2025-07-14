@@ -4,6 +4,7 @@ import MusicSearchAutocomplete from '../components/MusicSearchAutocomplete'
 import IconUpload from '../components/IconUpload'
 import { SearchResult } from '../services/musicSearch'
 import { UserProfile, Song, ThemeColor, THEME_COLORS, MUSIC_GENRES } from '../types/user'
+import { saveUser } from '../utils/userData'
 
 export default function CreateUser() {
   const navigate = useNavigate()
@@ -108,21 +109,13 @@ export default function CreateUser() {
     setIsSubmitting(true)
     
     try {
-      // 既存のユーザーデータを取得
-      const existingData = localStorage.getItem('musicmeisi_users')
-      const users = existingData ? JSON.parse(existingData) : {}
-
-      // 新しいユーザーデータを保存
-      const finalProfile = {
-        ...userProfile,
-        updatedAt: new Date().toISOString()
+      // 新しいデータ管理ユーティリティを使用
+      if (saveUser(userProfile)) {
+        // 成功メッセージを表示してユーザーページに遷移
+        navigate(`/users/${userProfile.username}`)
+      } else {
+        setErrors({ submit: 'データの保存に失敗しました' })
       }
-      
-      users[userProfile.username] = finalProfile
-      localStorage.setItem('musicmeisi_users', JSON.stringify(users))
-
-      // 成功メッセージを表示してユーザーページに遷移
-      navigate(`/users/${userProfile.username}`)
     } catch (error) {
       console.error('データの保存に失敗しました:', error)
       setErrors({ submit: 'データの保存に失敗しました' })

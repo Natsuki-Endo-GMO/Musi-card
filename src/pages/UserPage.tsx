@@ -8,6 +8,7 @@ import MusicStats from '../components/MusicStats'
 import { spotifySearch, SpotifyTrack } from '../services/spotifyApi'
 import { youtubeSearch, YouTubeTrack } from '../services/youtubeApi'
 import { UserProfile, Song, ThemeColor, THEME_COLORS } from '../types/user'
+import { loadUser, incrementViewCount } from '../utils/userData'
 
 // デフォルトテーマカラー
 const DEFAULT_THEME: ThemeColor = THEME_COLORS[0]
@@ -45,42 +46,27 @@ export default function UserPage() {
 
   const loadUserData = (username: string) => {
     try {
-      // まずローカルストレージから検索
-      const storedData = localStorage.getItem('musicmeisi_users')
-      if (storedData) {
-        const users = JSON.parse(storedData)
-        if (users[username]) {
-          // 新しいデータ構造に対応
-          if (typeof users[username] === 'object' && users[username].songs) {
-            setUserProfile({
-              ...createDefaultProfile(username),
-              ...users[username],
-              themeColor: users[username].themeColor || DEFAULT_THEME
-            })
-          } else {
-            // 古いデータ構造（後方互換性）
-            setUserProfile({
-              ...createDefaultProfile(username),
-              songs: users[username],
-              displayName: username
-            })
-          }
-          // 訪問者数を増加
-          incrementViewCount(username)
-          setLoading(false)
-          return
-        }
-      }
-
-      // ローカルストレージにない場合はサンプルデータから検索
-      if (usersData[username as keyof typeof usersData]) {
+      // 新しいデータ管理ユーティリティを使用
+      const userData = loadUser(username)
+      
+      if (userData) {
         setUserProfile({
-          ...createDefaultProfile(username),
-          songs: usersData[username as keyof typeof usersData],
-          displayName: username
+          ...userData,
+          themeColor: userData.themeColor || DEFAULT_THEME
         })
+        // 訪問者数を増加
+        incrementViewCount(username)
       } else {
-        setUserProfile(createDefaultProfile(username))
+        // ローカルストレージにない場合はサンプルデータから検索
+        if (usersData[username as keyof typeof usersData]) {
+          setUserProfile({
+            ...createDefaultProfile(username),
+            songs: usersData[username as keyof typeof usersData],
+            displayName: username
+          })
+        } else {
+          setUserProfile(createDefaultProfile(username))
+        }
       }
     } catch (error) {
       console.error('ユーザーデータの読み込みに失敗しました:', error)
@@ -90,25 +76,9 @@ export default function UserPage() {
     }
   }
 
-  const incrementViewCount = (username: string) => {
-    try {
-      const storedData = localStorage.getItem('musicmeisi_users')
-      if (storedData) {
-        const users = JSON.parse(storedData)
-        if (users[username]) {
-          users[username].viewCount = (users[username].viewCount || 0) + 1
-          users[username].updatedAt = new Date().toISOString()
-          localStorage.setItem('musicmeisi_users', JSON.stringify(users))
-        }
-      }
-    } catch (error) {
-      console.error('訪問者数の更新に失敗しました:', error)
-    }
-  }
-
   const fetchSpotifyPreview = async (song: Song): Promise<Song> => {
     try {
-      const results = await spotifySearch(song.title, song.artist)
+      const results = await spotifySearch.searchTracksAdvanced(song.title, song.artist)
       if (results.length > 0) {
         const track = results[0]
         return {
