@@ -4,15 +4,5 @@
       "runtime": "nodejs18.x"
     }
   },
-  "env": {
-    "BLOB_READ_WRITE_TOKEN": "@blob-read-write-token",
-    "YOUTUBE_API_KEY": "@youtube-api-key"
-  },
-  "build": {
-    "env": {
-      "BLOB_READ_WRITE_TOKEN": "@blob-read-write-token",
-      "YOUTUBE_API_KEY": "@youtube-api-key"
-    }
-  },
   "installCommand": "npm install --ignore-scripts"
 } 

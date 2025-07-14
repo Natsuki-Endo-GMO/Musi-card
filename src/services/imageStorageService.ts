@@ -11,6 +11,9 @@ if (!BLOB_READ_WRITE_TOKEN) {
 // 本番環境での画像処理を無効化（Vercelの制限のため）
 const isProduction = process.env.NODE_ENV === 'production'
 
+// 環境変数が設定されていない場合は常にフォールバック
+const useFallback = !BLOB_READ_WRITE_TOKEN || isProduction
+
 export interface ImageUploadResult {
   url: string
   size: number
@@ -41,7 +44,7 @@ export class ImageStorageService {
    * Blob Storageが利用可能かチェック
    */
   private isBlobStorageAvailable(): boolean {
-    return !!BLOB_READ_WRITE_TOKEN
+    return !!BLOB_READ_WRITE_TOKEN && !useFallback
   }
 
   /**
