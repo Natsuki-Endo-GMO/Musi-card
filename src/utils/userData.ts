@@ -1,4 +1,4 @@
-import { UserProfile, GRID_LAYOUTS } from '../types/user'
+import { UserProfile, GRID_LAYOUTS, BASE_COLORS, THEME_COLORS } from '../types/user'
 
 // LocalStorageのキー
 const STORAGE_KEY = 'musicmeisi_users'
@@ -48,10 +48,18 @@ export const loadUser = (username: string): UserProfile | null => {
       return null
     }
     
-    // マイグレーション: gridLayoutプロパティの確認と更新
+    // マイグレーション: 新しいプロパティの確認と更新
     let needsMigration = false
     let migratedData = { ...userData }
     
+    // baseColorプロパティの追加
+    if (!userData.baseColor) {
+      migratedData.baseColor = BASE_COLORS[0] // ライトベースをデフォルトに
+      needsMigration = true
+      console.log(`🔄 ユーザー「${username}」: baseColorを追加`)
+    }
+    
+    // gridLayoutプロパティの確認と更新
     if (!userData.gridLayout) {
       // gridLayoutが存在しない場合はデフォルト値を設定
       migratedData.gridLayout = GRID_LAYOUTS[1] // デフォルトは4x4（Dashboard.tsxと統一）
