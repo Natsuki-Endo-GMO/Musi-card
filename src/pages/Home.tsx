@@ -102,8 +102,8 @@ export default function Home() {
                 </p>
               </div>
               <button
-                onClick={() => {
-                  const authUrl = generateSpotifyAuthUrl()
+                onClick={async () => {
+                  const authUrl = await generateSpotifyAuthUrl()
                   window.open(authUrl, '_blank')
                 }}
                 className="bg-green-500 text-white px-4 py-2 rounded-xl font-semibold hover:bg-green-600 transition-colors duration-300 flex items-center gap-2"

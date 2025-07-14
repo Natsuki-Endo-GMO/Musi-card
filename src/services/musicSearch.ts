@@ -731,37 +731,17 @@ export interface SpotifyAuthConfig {
 /**
  * Spotify認証URLを生成（Authorization Code Flow）
  */
-export function generateSpotifyAuthUrl(): string {
-  // 127.0.0.1のループバックアドレスを使用（HTTPでもSpotify登録可能）
-  const redirectUri = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:5173/callback'
-  const scopes = 'user-read-private user-read-email user-top-read'
-  const state = Math.random().toString(36).substring(2, 15) + Date.now().toString() // より一意なstate生成
-  
-  const params = new URLSearchParams({
-    response_type: 'code', // Authorization Code Flowに変更
-    client_id: SPOTIFY_CLIENT_ID,
-    scope: scopes,
-    redirect_uri: redirectUri,
-    show_dialog: 'true',
-    state: state
-  })
-  
-  // CSRFトークンをlocalStorageに保存（より信頼性が高い）
-  localStorage.setItem('spotify_auth_state', state)
-  localStorage.setItem('spotify_auth_timestamp', Date.now().toString())
-  
-  console.log('🔐 認証URL生成:')
-  console.log(`   State: ${state}`)
-  console.log(`   Redirect URI: ${redirectUri}`)
-  
-  return `https://accounts.spotify.com/authorize?${params.toString()}`
+export async function generateSpotifyAuthUrl(): Promise<string> {
+  // 新しいspotifyApi.tsの実装を使用
+  const { spotifyAuth } = await import('./spotifyApi');
+  return spotifyAuth.getAuthUrl();
 }
 
 /**
  * Spotify認証を開始（ポップアップまたはリダイレクト）
  */
-export function startSpotifyAuth(usePopup = false): Promise<string> | void {
-  const authUrl = generateSpotifyAuthUrl()
+export async function startSpotifyAuth(usePopup = false): Promise<string | void> {
+  const authUrl = await generateSpotifyAuthUrl()
   
   if (usePopup) {
     return new Promise((resolve, reject) => {

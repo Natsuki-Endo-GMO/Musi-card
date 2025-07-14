@@ -42,12 +42,10 @@ const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 const AUTH_ENDPOINT = 'https://accounts.spotify.com/authorize';
 const TOKEN_ENDPOINT = 'https://accounts.spotify.com/api/token';
 
-// スコープ設定
+// スコープ設定（必要最小限）
 const SCOPES = [
   'user-read-private',
-  'user-read-email',
-  'playlist-read-private',
-  'user-library-read'
+  'user-read-email'
 ].join(' ');
 
 // PKCE用のユーティリティ関数
@@ -84,16 +82,18 @@ export const spotifyAuth = {
     // code_verifierをlocalStorageに保存
     localStorage.setItem('spotify_code_verifier', codeVerifier);
     
-    // デバッグ用ログ
-    console.log('🎵 Spotify Auth:', {
-      redirectUri,
-      environment: import.meta.env.MODE,
-      isProd: import.meta.env.PROD,
-      hostname: typeof window !== 'undefined' ? window.location.hostname : 'SSR',
-      protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown',
-      port: typeof window !== 'undefined' ? window.location.port : 'unknown',
-      envVar: import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'not set'
-    });
+    // デバッグ用ログ（開発環境のみ）
+    if (import.meta.env.DEV) {
+      console.log('🎵 Spotify Auth:', {
+        redirectUri,
+        environment: import.meta.env.MODE,
+        isProd: import.meta.env.PROD,
+        hostname: typeof window !== 'undefined' ? window.location.hostname : 'SSR',
+        protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown',
+        port: typeof window !== 'undefined' ? window.location.port : 'unknown',
+        envVar: import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'not set'
+      });
+    }
     
     const params = new URLSearchParams({
       client_id: CLIENT_ID,
@@ -102,7 +102,7 @@ export const spotifyAuth = {
       scope: SCOPES,
       code_challenge_method: 'S256',
       code_challenge: codeChallenge,
-      state: generateRandomString(16)
+      state: generateRandomString(32)
     });
     return `${AUTH_ENDPOINT}?${params.toString()}`;
   },
@@ -336,6 +336,15 @@ export const spotifyPreview = {
 
 // ユーティリティ関数
 function generateRandomString(length: number): string {
+  // より安全な乱数生成
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const array = new Uint32Array(length);
+    crypto.getRandomValues(array);
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    return Array.from(array, (dec) => possible[dec % possible.length]).join('');
+  }
+  
+  // フォールバック
   const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let text = '';
   for (let i = 0; i < length; i++) {
