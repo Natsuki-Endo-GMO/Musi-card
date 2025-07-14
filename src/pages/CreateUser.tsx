@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import MusicSearchAutocomplete from '../components/MusicSearchAutocomplete'
 import IconUpload from '../components/IconUpload'
 import { SearchResult } from '../services/musicSearch'
-import { UserProfile, Song, ThemeColor, THEME_COLORS, MUSIC_GENRES } from '../types/user'
+import { UserProfile, Song, ThemeColor, THEME_COLORS, MUSIC_GENRES, GRID_LAYOUTS } from '../types/user'
 import { saveUser } from '../utils/userData'
 
 export default function CreateUser() {
@@ -16,6 +16,7 @@ export default function CreateUser() {
     socialLinks: {},
     favoriteGenres: [],
     songs: [],
+    gridLayout: GRID_LAYOUTS[0],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     viewCount: 0,

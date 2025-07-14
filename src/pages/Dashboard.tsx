@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { UserProfile, Song, ThemeColor, THEME_COLORS } from '../types/user'
+import { UserProfile, Song, ThemeColor, THEME_COLORS, GRID_LAYOUTS } from '../types/user'
 import { storageService } from '../services/storageService'
 import MusicSearchAutocomplete from '../components/MusicSearchAutocomplete'
 import { SearchResult } from '../services/musicSearch'
@@ -41,6 +41,7 @@ export default function Dashboard() {
           socialLinks: {},
           favoriteGenres: [],
           songs: [],
+          gridLayout: GRID_LAYOUTS[0],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           viewCount: 0,
