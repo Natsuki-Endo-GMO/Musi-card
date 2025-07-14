@@ -1,4 +1,10 @@
-import sharp from 'sharp'
+// 本番環境ではsharpを使用しない（Vercelの制限のため）
+let sharp: any = null
+try {
+  sharp = require('sharp')
+} catch (error) {
+  console.warn('⚠️ sharpパッケージが利用できません。画像処理機能が制限されます。')
+}
 
 export interface ImageProcessingOptions {
   maxWidth?: number
@@ -63,6 +69,19 @@ export async function processImage(
   const opts = { ...DEFAULT_OPTIONS, ...options }
   
   try {
+    // sharpが利用できない場合は元のバッファを返す
+    if (!sharp) {
+      console.warn('⚠️ sharpが利用できません。画像処理をスキップします。')
+      const buffer = typeof input === 'string' ? Buffer.from(input) : input
+      return {
+        buffer,
+        format: 'jpeg',
+        size: buffer.length,
+        width: 0,
+        height: 0
+      }
+    }
+    
     let pipeline = sharp(input)
     
     // メタデータを取得
@@ -117,7 +136,15 @@ export async function processImage(
     }
   } catch (error) {
     console.error('画像処理エラー:', error)
-    throw new Error('画像の処理に失敗しました')
+    // エラーの場合は元のバッファを返す
+    const buffer = typeof input === 'string' ? Buffer.from(input) : input
+    return {
+      buffer,
+      format: 'jpeg',
+      size: buffer.length,
+      width: 0,
+      height: 0
+    }
   }
 }
 

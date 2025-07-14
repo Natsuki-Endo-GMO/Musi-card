@@ -8,6 +8,9 @@ if (!BLOB_READ_WRITE_TOKEN) {
   console.warn('⚠️ BLOB_READ_WRITE_TOKENが設定されていません。画像ストレージ機能が無効になります。')
 }
 
+// 本番環境での画像処理を無効化（Vercelの制限のため）
+const isProduction = process.env.NODE_ENV === 'production'
+
 export interface ImageUploadResult {
   url: string
   size: number
@@ -61,9 +64,22 @@ export class ImageStorageService {
         throw new Error('ファイルサイズが大きすぎます（最大5MB）')
       }
 
-      // 画像処理
+      // 画像処理（本番環境ではスキップ）
       const buffer = Buffer.from(await file.arrayBuffer())
-      const processed = await processImage(buffer, IMAGE_PRESETS.userIcon)
+      let processed: ProcessedImage
+      
+      if (isProduction) {
+        // 本番環境では画像処理をスキップ
+        processed = {
+          buffer,
+          format: file.type.split('/')[1] || 'jpeg',
+          size: buffer.length,
+          width: 0,
+          height: 0
+        }
+      } else {
+        processed = await processImage(buffer, IMAGE_PRESETS.userIcon)
+      }
 
       // ファイル名生成
       const fileName = generateSafeFileName(file.name, username, 'icon')
@@ -114,9 +130,22 @@ export class ImageStorageService {
         throw new Error('ファイルサイズが大きすぎます（最大5MB）')
       }
 
-      // 画像処理
+      // 画像処理（本番環境ではスキップ）
       const buffer = Buffer.from(await file.arrayBuffer())
-      const processed = await processImage(buffer, IMAGE_PRESETS.albumCover)
+      let processed: ProcessedImage
+      
+      if (isProduction) {
+        // 本番環境では画像処理をスキップ
+        processed = {
+          buffer,
+          format: file.type.split('/')[1] || 'jpeg',
+          size: buffer.length,
+          width: 0,
+          height: 0
+        }
+      } else {
+        processed = await processImage(buffer, IMAGE_PRESETS.albumCover)
+      }
 
       // ファイル名生成
       const fileName = generateSafeFileName(file.name, username, 'album')
@@ -166,9 +195,22 @@ export class ImageStorageService {
 
       const buffer = Buffer.from(await response.arrayBuffer())
 
-      // 画像処理
-      const preset = type === 'icon' ? IMAGE_PRESETS.userIcon : IMAGE_PRESETS.albumCover
-      const processed = await processImage(buffer, preset)
+      // 画像処理（本番環境ではスキップ）
+      let processed: ProcessedImage
+      
+      if (isProduction) {
+        // 本番環境では画像処理をスキップ
+        processed = {
+          buffer,
+          format: 'jpeg',
+          size: buffer.length,
+          width: 0,
+          height: 0
+        }
+      } else {
+        const preset = type === 'icon' ? IMAGE_PRESETS.userIcon : IMAGE_PRESETS.albumCover
+        processed = await processImage(buffer, preset)
+      }
 
       // ファイル名生成
       const fileName = generateSafeFileName(`external-${Date.now()}`, username, type)
