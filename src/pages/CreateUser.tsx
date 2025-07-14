@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import MusicSearchAutocomplete from '../components/MusicSearchAutocomplete'
 import IconUpload from '../components/IconUpload'
 import { SearchResult } from '../services/musicSearch'
-import { UserProfile, Song, ThemeColor, THEME_COLORS, MUSIC_GENRES, GRID_LAYOUTS } from '../types/user'
+import { UserProfile, Song, ThemeColor, THEME_COLORS, BASE_COLORS, MUSIC_GENRES, GRID_LAYOUTS } from '../types/user'
 import { saveUser } from '../utils/userData'
 
 export default function CreateUser() {
@@ -12,6 +12,7 @@ export default function CreateUser() {
     username: '',
     displayName: '',
     bio: '',
+    baseColor: BASE_COLORS[0], // ライトベースをデフォルトに
     themeColor: THEME_COLORS[0],
     socialLinks: {},
     favoriteGenres: [],
@@ -226,7 +227,7 @@ export default function CreateUser() {
               </div>
             </div>
 
-            {/* アイコンとテーマカラー */}
+            {/* アイコンとカラー設定 */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">外観設定</h2>
               
@@ -240,31 +241,67 @@ export default function CreateUser() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  テーマカラー
-                </label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {THEME_COLORS.map((color) => (
-                    <label key={color.id} className="cursor-pointer">
-                      <input
-                        type="radio"
-                        name="themeColor"
-                        value={color.id}
-                        checked={userProfile.themeColor.id === color.id}
-                        onChange={() => setUserProfile(prev => ({ ...prev, themeColor: color }))}
-                        className="sr-only"
-                      />
-                      <div className={`p-3 rounded-lg border-2 transition-all ${
-                        userProfile.themeColor.id === color.id
-                          ? 'border-gray-800 bg-gray-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}>
-                        <div className={`w-full h-8 rounded-lg bg-gradient-to-r ${color.gradient} mb-2`}></div>
-                        <p className="text-sm font-medium text-gray-800">{color.name}</p>
-                      </div>
-                    </label>
-                  ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* ベースカラー選択 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    ベースカラー
+                  </label>
+                  <p className="text-sm text-gray-600 mb-3">
+                    音楽名刺の基本となる背景色を選択してください。
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {BASE_COLORS.map((baseColor) => (
+                      <label key={baseColor.id} className="cursor-pointer">
+                        <input
+                          type="radio"
+                          name="baseColor"
+                          checked={userProfile.baseColor.id === baseColor.id}
+                          onChange={() => setUserProfile(prev => ({ ...prev, baseColor: baseColor }))}
+                          className="sr-only"
+                        />
+                        <div className={`relative p-3 rounded-lg border-2 transition-all ${
+                          userProfile.baseColor.id === baseColor.id
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}>
+                          <div className={`w-full h-6 rounded-lg ${baseColor.background} mb-2`}></div>
+                          <p className="text-sm font-medium text-gray-800">{baseColor.name}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* テーマカラー選択 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    テーマカラー
+                  </label>
+                  <p className="text-sm text-gray-600 mb-3">
+                    アイコンの枠線やボタンの色に反映されます。
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {THEME_COLORS.map((color) => (
+                      <label key={color.id} className="cursor-pointer">
+                        <input
+                          type="radio"
+                          name="themeColor"
+                          checked={userProfile.themeColor.id === color.id}
+                          onChange={() => setUserProfile(prev => ({ ...prev, themeColor: color }))}
+                          className="sr-only"
+                        />
+                        <div className={`p-3 rounded-lg border-2 transition-all ${
+                          userProfile.themeColor.id === color.id
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}>
+                          <div className={`w-full h-6 rounded-lg bg-gradient-to-r ${color.gradient} mb-2`}></div>
+                          <p className="text-sm font-medium text-gray-800">{color.name}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
