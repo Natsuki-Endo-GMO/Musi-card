@@ -44,8 +44,18 @@ export default function SpotifyCallback() {
         }
 
         // State検証（CSRF攻撃防止）
-        const savedState = localStorage.getItem('spotify_auth_state')
-        const savedCodeVerifier = localStorage.getItem('spotify_code_verifier')
+        const savedState = localStorage.getItem('spotify_current_state')
+        const authDataStr = localStorage.getItem(`spotify_auth_${state}`)
+        let savedCodeVerifier: string | null = null
+        
+        if (authDataStr) {
+          try {
+            const authData = JSON.parse(authDataStr)
+            savedCodeVerifier = authData.codeVerifier
+          } catch (e) {
+            console.error('❌ 認証データ解析エラー:', e)
+          }
+        }
         
         console.log('🔍 LocalStorage状態確認:')
         console.log(`   受信したcode: ${code.substring(0, 10)}...`)
@@ -73,8 +83,9 @@ export default function SpotifyCallback() {
         // アクセストークンを保存
         setSpotifyAccessToken(accessToken)
         
-        // 使用済みの認証情報をクリア（新しい実装では自動クリア）
-        localStorage.removeItem('spotify_auth_state')
+        // 使用済みの認証情報をクリア
+        localStorage.removeItem('spotify_current_state')
+        localStorage.removeItem(`spotify_auth_${state}`)
         
         // 音楽検索プロバイダーをSpotifyに設定
         setMusicProvider('spotify')
