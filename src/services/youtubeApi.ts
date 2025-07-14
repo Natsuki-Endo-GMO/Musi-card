@@ -1,5 +1,7 @@
 // YouTube Data API v3設定（サーバーサイド経由）
-const YOUTUBE_API_ENDPOINT = '/api/youtube/search';
+const YOUTUBE_API_ENDPOINT = import.meta.env.DEV 
+  ? 'http://localhost:3001/api/youtube/search'
+  : '/api/youtube/search';
 
 export interface YouTubeTrack {
   id: string;
