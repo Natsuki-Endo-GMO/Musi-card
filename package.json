@@ -10,7 +10,8 @@
     "dev:ngrok": "concurrently \"npm run dev\" \"ngrok http 5173\"",
     "dev:vercel": "concurrently \"vite\" \"vercel dev --listen 3001\"",
     "build": "tsc && vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint .",
+    "lint:strict": "eslint . --max-warnings 0",
     "preview": "vite preview"
   },
   "keywords": [],

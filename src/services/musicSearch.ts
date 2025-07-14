@@ -100,7 +100,7 @@ const initializeSpotifyToken = () => {
     console.log('Spotify トークンをローカルストレージから復元しました')
     
     // Spotifyが利用可能な場合はデフォルトプロバイダーに設定
-    if (Boolean(SPOTIFY_CLIENT_ID)) {
+    if (SPOTIFY_CLIENT_ID) {
       setMusicProvider('spotify')
     }
   }
@@ -322,7 +322,7 @@ export async function ensureValidToken(): Promise<string | null> {
 const searchMusicSpotify = async (query: string): Promise<SearchResult[]> => {
   clearSearchStatus() // 新しい検索開始時にクリア
   
-  if (!Boolean(SPOTIFY_CLIENT_ID)) {
+  if (!SPOTIFY_CLIENT_ID) {
     const reason = 'Spotify設定（CLIENT_ID）が不完全です'
     recordSearchStatus('spotify', false, reason, `${reason}。Last.fmにフォールバックします。`)
     return searchMusicLastFm(query)
@@ -604,10 +604,11 @@ export const searchMusic = async (query: string): Promise<SearchResult[]> => {
           return await searchMusicSpotify(query)
         case 'lastfm':
           return await searchMusicLastFm(query)
-        default:
+        default: {
           const errorMsg = `未サポートのプロバイダー: ${currentProvider}`
           recordSearchStatus(currentProvider, false, errorMsg)
           throw new Error(errorMsg)
+        }
       }
     } catch (error: any) {
       console.error(`${currentProvider.toUpperCase()}検索エラー:`, error)
