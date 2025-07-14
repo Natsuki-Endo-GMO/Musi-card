@@ -1,19 +1,24 @@
-import { useParams, Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import usersData from '../../data/users.json'
-import MusicPlayer from '../components/MusicPlayer'
-import YouTubePlayer from '../components/YouTubePlayer'
-import ShareProfile from '../components/ShareProfile'
-import MusicStats from '../components/MusicStats'
-import { spotifySearch } from '../services/spotifyApi'
-import { youtubeSearch } from '../services/youtubeApi'
+import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { UserProfile, Song, THEME_COLORS, GRID_LAYOUTS } from '../types/user'
 import { storageService } from '../services/storageService'
+import YouTubePlayer from '../components/YouTubePlayer'
+import ShareProfile from '../components/ShareProfile'
+import usersData from '../../data/users.json'
+import MusicPlayer from '../components/MusicPlayer'
+import { spotifySearch } from '../services/spotifyApi'
+import { youtubeSearch } from '../services/youtubeApi'
 
 export default function UserPage() {
   const { username } = useParams<{ username: string }>()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [playingSong, setPlayingSong] = useState<Song | null>(null)
+  
+  // プレビューモードかどうかを判定（Dashboard.tsxからのpreview用）
+  const isPreviewMode = location.state?.isPreview === true
   const [selectedSong, setSelectedSong] = useState<Song | null>(null)
   const [showPlayer, setShowPlayer] = useState(false)
   const [loadingPreview, setLoadingPreview] = useState(false)
@@ -176,15 +181,15 @@ export default function UserPage() {
           <p className="text-gray-600 mb-6">
             お探しのユーザー「{username}」は存在しないか、楽曲が登録されていません。
           </p>
-          <Link 
-            to="/"
+          <button
+            onClick={() => navigate('/')}
             className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             ホームに戻る
-          </Link>
+          </button>
         </div>
       </div>
     )
@@ -200,29 +205,41 @@ export default function UserPage() {
       <div className="relative z-10">
         {/* ヘッダー */}
         <div className="flex items-center justify-between p-6">
-          <Link 
-            to="/"
+          <button
+            onClick={() => navigate('/')}
             className="flex items-center text-white hover:text-gray-300 transition-colors"
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             ホームに戻る
-          </Link>
+          </button>
           
           <div className="flex gap-2">
-            <button
-              onClick={() => setShowStats(!showStats)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                showStats 
-                  ? 'bg-white text-black' 
-                  : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
-              }`}
-            >
-              統計
-            </button>
-            <button
-              onClick={() => setShowShare(!showShare)}
+            {isPreviewMode && (
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+              >
+                編集画面に戻る
+              </button>
+            )}
+            
+            {/* プレビューモードまたは外部からのアクセス時に統計・共有ボタンを表示 */}
+            {(isPreviewMode || location.pathname.includes('/users/')) && (
+              <>
+                <button
+                  onClick={() => setShowStats(!showStats)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    showStats 
+                      ? 'bg-white text-black' 
+                      : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
+                  }`}
+                >
+                  統計
+                </button>
+                <button
+                  onClick={() => setShowShare(!showShare)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 showShare 
                   ? 'bg-white text-black' 
@@ -230,7 +247,9 @@ export default function UserPage() {
               }`}
             >
               共有
-            </button>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -240,7 +259,8 @@ export default function UserPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {showStats && (
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
-                  <MusicStats songs={userProfile.songs} />
+                  {/* MusicStatsコンポーネントは削除されたため、ここには何も表示しない */}
+                  {/* もしMusicStatsコンポーネントが再導入される場合は、ここに追加 */}
                 </div>
               )}
               {showShare && (

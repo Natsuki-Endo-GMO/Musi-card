@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { UserProfile, Song, ThemeColor, THEME_COLORS, GRID_LAYOUTS } from '../types/user'
 import { storageService } from '../services/storageService'
 import MusicSearchAutocomplete from '../components/MusicSearchAutocomplete'
+import IconUpload from '../components/IconUpload'
 import { SearchResult } from '../services/musicSearch'
 
 export default function Dashboard() {
@@ -41,7 +42,7 @@ export default function Dashboard() {
           socialLinks: {},
           favoriteGenres: [],
           songs: [],
-          gridLayout: GRID_LAYOUTS[0],
+          gridLayout: GRID_LAYOUTS[1], // デフォルトは4x4
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           viewCount: 0,
@@ -94,8 +95,10 @@ export default function Dashboard() {
 
   const handlePreview = () => {
     if (currentUser) {
-      // 新しいタブでプレビューを開く
-      window.open(`/users/${currentUser}`, '_blank')
+      // プレビューモードで同じタブで表示
+      navigate(`/users/${currentUser}`, { 
+        state: { isPreview: true } 
+      })
     }
   }
 
@@ -197,6 +200,19 @@ export default function Dashboard() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
+                    プロフィールアイコン
+                  </label>
+                  <IconUpload
+                    currentIcon={userProfile.icon || ''}
+                    onIconChange={(iconUrl: string) => setUserProfile({
+                      ...userProfile,
+                      icon: iconUrl
+                    })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     表示名
                   </label>
                   <input
@@ -233,19 +249,16 @@ export default function Dashboard() {
                   <div className="grid grid-cols-4 gap-2">
                     {THEME_COLORS.map((theme) => (
                       <button
-                        key={theme.name}
+                        key={theme.id}
                         onClick={() => setUserProfile({
                           ...userProfile,
                           themeColor: theme
                         })}
-                        className={`p-3 rounded-lg text-white text-xs font-medium transition-all ${
-                          userProfile.themeColor.name === theme.name
+                        className={`p-3 rounded-lg text-white text-xs font-medium transition-all bg-gradient-to-br ${theme.gradient} ${
+                          userProfile.themeColor.id === theme.id
                             ? 'ring-2 ring-gray-400 scale-105'
                             : 'hover:scale-105'
                         }`}
-                        style={{
-                          background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`
-                        }}
                       >
                         {theme.name}
                       </button>
@@ -330,19 +343,20 @@ export default function Dashboard() {
           </div>
 
           {/* 右側：楽曲リスト */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col h-full max-h-[calc(100vh-12rem)]">
             <h2 className="text-xl font-bold text-gray-800 mb-4">
               楽曲リスト ({userProfile.songs.length})
             </h2>
             
             {userProfile.songs.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 flex-1 flex items-center justify-center flex-col">
                 <div className="text-4xl mb-4">🎵</div>
                 <p>まだ楽曲が追加されていません</p>
                 <p className="text-sm">左側の検索から楽曲を追加してみましょう</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="flex-1 min-h-0">
+                <div className="h-full overflow-y-auto pr-2 space-y-3">
                 {userProfile.songs.map((song) => (
                   <div key={song.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
                     <img
@@ -365,7 +379,8 @@ export default function Dashboard() {
                       🗑️
                     </button>
                   </div>
-                ))}
+                                  ))}
+                </div>
               </div>
             )}
           </div>

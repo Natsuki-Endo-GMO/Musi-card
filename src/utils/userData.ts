@@ -54,7 +54,7 @@ export const loadUser = (username: string): UserProfile | null => {
     
     if (!userData.gridLayout) {
       // gridLayoutが存在しない場合はデフォルト値を設定
-      migratedData.gridLayout = GRID_LAYOUTS[1] // デフォルトは4x4
+      migratedData.gridLayout = GRID_LAYOUTS[1] // デフォルトは4x4（Dashboard.tsxと統一）
       needsMigration = true
       console.log(`🔄 ユーザー「${username}」: gridLayoutを追加`)
     } else if (userData.gridLayout && 'centerPosition' in userData.gridLayout) {
