@@ -1,8 +1,10 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { startSpotifyAuth, generateSpotifyAuthUrl } from '../services/musicSearch'
 import SpotifyDebugInfo from '../components/SpotifyDebugInfo'
 
 export default function Home() {
+  const navigate = useNavigate()
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
       <div className="container mx-auto px-4 py-16">
@@ -126,6 +128,19 @@ export default function Home() {
             <SpotifyDebugInfo />
           </div>
         )}
+
+        {/* 管理者ボタン（目立たない場所） */}
+        <div className="mt-16 pt-8 border-t border-gray-200/50">
+          <div className="text-center">
+            <button
+              onClick={() => navigate('/admin-login')}
+              className="text-xs text-gray-300 hover:text-gray-500 transition-colors px-2 py-1 rounded opacity-50 hover:opacity-100"
+              title="管理者ログイン"
+            >
+              ⚙️
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

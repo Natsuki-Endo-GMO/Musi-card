@@ -16,10 +16,52 @@ export default function ManageUsers() {
   const [users, setUsers] = useState<UserInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [showDataManager, setShowDataManager] = useState(false)
+  const [isAuthorized, setIsAuthorized] = useState(false)
 
   useEffect(() => {
-    loadUsers()
+    checkAdminAuth()
   }, [])
+
+  const checkAdminAuth = () => {
+    const adminUser = localStorage.getItem('musicard_admin')
+    const adminLoginTime = localStorage.getItem('musicard_admin_login_time')
+    
+    if (!adminUser || !adminLoginTime) {
+      console.warn('🛡️ 管理者権限がありません')
+      navigate('/admin-login')
+      return
+    }
+
+    // セッション有効期限チェック（24時間）
+    const loginTime = parseInt(adminLoginTime)
+    const currentTime = Date.now()
+    const sessionDuration = 24 * 60 * 60 * 1000 // 24時間
+
+    if (currentTime - loginTime > sessionDuration) {
+      console.warn('🛡️ 管理者セッションが期限切れです')
+      localStorage.removeItem('musicard_admin')
+      localStorage.removeItem('musicard_admin_login_time')
+      navigate('/admin-login')
+      return
+    }
+
+    // 管理者ユーザーの確認
+    const adminUsers = (import.meta.env.VITE_ADMIN_USERS || 'admin').split(',')
+    if (!adminUsers.includes(adminUser)) {
+      console.warn('🛡️ 管理者権限が無効です')
+      navigate('/admin-login')
+      return
+    }
+
+    setIsAuthorized(true)
+    loadUsers()
+  }
+
+  useEffect(() => {
+    if (isAuthorized) {
+      loadUsers()
+    }
+  }, [isAuthorized])
 
   const loadUsers = () => {
     try {
@@ -47,9 +89,29 @@ export default function ManageUsers() {
     navigate(`/edit/${username}`)
   }
 
+  const handleLogout = () => {
+    if (confirm('管理者ログアウトしますか？')) {
+      localStorage.removeItem('musicard_admin')
+      localStorage.removeItem('musicard_admin_login_time')
+      navigate('/')
+    }
+  }
+
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A'
     return new Date(dateString).toLocaleString('ja-JP')
+  }
+
+  // 認証チェック中の表示
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">管理者認証を確認中...</p>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -69,8 +131,14 @@ export default function ManageUsers() {
         {/* ヘッダー */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">音楽名刺管理</h1>
-            <p className="text-gray-600">作成された音楽名刺の管理とデータ統計</p>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-4xl font-bold text-gray-800">管理者パネル</h1>
+              <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">ADMIN</span>
+            </div>
+            <p className="text-gray-600">音楽名刺の管理とデータ統計</p>
+            <p className="text-sm text-gray-500 mt-1">
+              管理者: {localStorage.getItem('musicard_admin')}
+            </p>
           </div>
           <div className="flex gap-3">
             <button
@@ -83,12 +151,12 @@ export default function ManageUsers() {
             >
               データ管理
             </button>
-            <Link 
-              to="/create"
-              className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-6 py-2 rounded-lg font-medium hover:from-blue-600 hover:to-cyan-600 transition-all hover:scale-105 shadow-lg"
+            <button
+              onClick={handleLogout}
+              className="bg-red-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors"
             >
-              新しい名刺を作成
-            </Link>
+              ログアウト
+            </button>
             <Link 
               to="/"
               className="bg-white text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors border border-gray-200"

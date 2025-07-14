@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import Home from './pages/Home'
 import Login from './pages/Login'
+import AdminLogin from './pages/AdminLogin'
 import Dashboard from './pages/Dashboard'
 import UserPage from './pages/UserPage'
 import CreateUser from './pages/CreateUser'
@@ -15,6 +16,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/users/:username" element={<UserPage />} />
         <Route path="/create" element={<CreateUser />} />
