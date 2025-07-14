@@ -45,6 +45,15 @@ export default function SpotifyCallback() {
 
         // State検証（CSRF攻撃防止）
         const savedState = localStorage.getItem('spotify_auth_state')
+        const savedCodeVerifier = localStorage.getItem('spotify_code_verifier')
+        
+        console.log('🔍 LocalStorage状態確認:')
+        console.log(`   受信したcode: ${code.substring(0, 10)}...`)
+        console.log(`   受信したstate: "${state}"`)
+        console.log(`   保存されたstate: "${savedState}"`)
+        console.log(`   code_verifier: ${savedCodeVerifier ? '✅ 存在' : '❌ なし'}`)
+        console.log(`   state一致: ${savedState === state}`)
+        
         if (import.meta.env.PROD && savedState !== state) {
           throw new Error('State parameter不一致 - セキュリティエラー')
         }

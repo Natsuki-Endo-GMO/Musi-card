@@ -119,28 +119,47 @@ export const spotifyAuth = {
       throw new Error('Code verifier not found');
     }
 
+    const redirectUri = getRedirectUri();
+    const requestBody = {
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri,
+      client_id: CLIENT_ID,
+      code_verifier: codeVerifier
+    };
+
+    // デバッグ情報をログ出力
+    console.log('🔄 トークン交換リクエスト開始...');
+    console.log(`   Redirect URI: ${redirectUri}`);
+    console.log(`   Client ID: ${CLIENT_ID ? '設定済み' : '❌ 未設定'}`);
+    console.log(`   認証コード: ${code.substring(0, 10)}...`);
+    console.log(`   Code Verifier: ${codeVerifier ? '設定済み' : '❌ 未設定'}`);
+
     const response = await fetch(TOKEN_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: getRedirectUri(),
-        client_id: CLIENT_ID,
-        code_verifier: codeVerifier
-      })
+      body: new URLSearchParams(requestBody)
     });
 
     // code_verifierを削除
     localStorage.removeItem('spotify_code_verifier');
 
     if (!response.ok) {
-      throw new Error('Failed to get access token');
+      let errorDetails = 'Unknown error';
+      try {
+        const errorData = await response.json();
+        errorDetails = JSON.stringify(errorData, null, 2);
+        console.error('❌ Token exchange失敗:', errorData);
+      } catch (e) {
+        console.error('❌ Token exchange失敗: レスポンス解析エラー');
+      }
+      throw new Error(`Failed to get access token: ${response.status} - ${errorDetails}`);
     }
 
     const data = await response.json();
+    console.log('✅ Token exchange成功!');
     return data.access_token;
   }
 };
