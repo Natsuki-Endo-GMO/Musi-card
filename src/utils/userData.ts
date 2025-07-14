@@ -1,4 +1,4 @@
-import { UserProfile } from '../types/user'
+import { UserProfile, GRID_LAYOUTS } from '../types/user'
 
 // LocalStorageのキー
 const STORAGE_KEY = 'musicmeisi_users'
@@ -38,11 +38,31 @@ export const loadAllUsers = (): UserDataStore => {
   }
 }
 
-// 特定のユーザーデータを読み込み
+// 特定のユーザーデータを読み込み（マイグレーション処理付き）
 export const loadUser = (username: string): UserProfile | null => {
   try {
     const allUsers = loadAllUsers()
-    return allUsers[username] || null
+    const userData = allUsers[username]
+    
+    if (!userData) {
+      return null
+    }
+    
+    // マイグレーション: gridLayoutプロパティが存在しない場合のデフォルト値設定
+    if (!userData.gridLayout) {
+      const migratedData = {
+        ...userData,
+        gridLayout: GRID_LAYOUTS[1] // デフォルトは4x4
+      }
+      
+      // マイグレーション後のデータを保存
+      saveUser(migratedData)
+      console.log(`🔄 ユーザー「${username}」のデータをマイグレーションしました（gridLayout追加）`)
+      
+      return migratedData
+    }
+    
+    return userData
   } catch (error) {
     console.error(`❌ ユーザー「${username}」の読み込みに失敗:`, error)
     return null

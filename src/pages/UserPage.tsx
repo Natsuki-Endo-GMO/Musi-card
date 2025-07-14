@@ -269,7 +269,7 @@ export default function UserPage() {
                   console.log(`レイアウト変更: ${layout.name}`)
                 }}
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  userProfile.gridLayout.id === layout.id
+                  (userProfile.gridLayout?.id || GRID_LAYOUTS[1].id) === layout.id
                     ? 'bg-white text-black' 
                     : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
                 }`}
@@ -284,13 +284,14 @@ export default function UserPage() {
             <div 
               className={`grid gap-2 aspect-square`}
               style={{
-                gridTemplateColumns: `repeat(${userProfile.gridLayout.size}, 1fr)`,
-                gridTemplateRows: `repeat(${userProfile.gridLayout.size}, 1fr)`
+                gridTemplateColumns: `repeat(${userProfile.gridLayout?.size || GRID_LAYOUTS[1].size}, 1fr)`,
+                gridTemplateRows: `repeat(${userProfile.gridLayout?.size || GRID_LAYOUTS[1].size}, 1fr)`
               }}
             >
-              {Array.from({ length: userProfile.gridLayout.totalCells }).map((_, index) => {
-                const isCenterCell = index === userProfile.gridLayout.centerPosition
-                const songIndex = isCenterCell ? -1 : index < userProfile.gridLayout.centerPosition ? index : index - 1
+              {Array.from({ length: userProfile.gridLayout?.totalCells || GRID_LAYOUTS[1].totalCells }).map((_, index) => {
+                const centerPosition = userProfile.gridLayout?.centerPosition || GRID_LAYOUTS[1].centerPosition
+                const isCenterCell = index === centerPosition
+                const songIndex = isCenterCell ? -1 : index < centerPosition ? index : index - 1
                 const song = songIndex >= 0 && songIndex < userProfile.songs.length ? userProfile.songs[songIndex] : null
                 
                 return (
