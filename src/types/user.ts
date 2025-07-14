@@ -1,8 +1,11 @@
 export interface Song {
+  id?: string
   title: string
   artist: string
-  jacket: string
+  jacket?: string
   isGeneratedImage?: boolean
+  previewUrl?: string | null
+  addedAt?: string
   spotify?: {
     id: string
     previewUrl: string | null

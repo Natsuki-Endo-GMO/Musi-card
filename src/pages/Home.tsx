@@ -19,16 +19,10 @@ export default function Home() {
           </p>
           <div className="flex justify-center gap-4 mb-8">
             <Link 
-              to="/create"
+              to="/login"
               className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-8 py-4 rounded-xl font-semibold hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 hover:scale-105 text-lg shadow-lg hover:shadow-xl"
             >
-              音楽名刺を作成
-            </Link>
-            <Link 
-              to="/manage"
-              className="bg-white text-gray-700 px-8 py-4 rounded-xl font-semibold hover:bg-gray-50 transition-all duration-300 hover:scale-105 text-lg border-2 border-gray-200 hover:border-gray-300 shadow-lg hover:shadow-xl"
-            >
-              名刺を管理
+              ログイン / 音楽名刺を作成
             </Link>
           </div>
           <div className="flex justify-center">
