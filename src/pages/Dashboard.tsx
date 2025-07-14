@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { UserProfile, Song, ThemeColor, THEME_COLORS, GRID_LAYOUTS } from '../types/user'
+import { UserProfile, Song, ThemeColor, THEME_COLORS, BASE_COLORS, GRID_LAYOUTS } from '../types/user'
 import { storageService } from '../services/storageService'
 import MusicSearchAutocomplete from '../components/MusicSearchAutocomplete'
 import IconUpload from '../components/IconUpload'
@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<ToastState | null>(null)
+  const [showMusicSearch, setShowMusicSearch] = useState(false)
 
   useEffect(() => {
     checkAuth()
@@ -45,7 +46,8 @@ export default function Dashboard() {
           username,
           displayName: username,
           bio: '',
-          themeColor: THEME_COLORS[0], // 白ベーステーマをデフォルトに
+          baseColor: BASE_COLORS[0], // ライトベースをデフォルトに
+          themeColor: THEME_COLORS[0], // ブルーテーマをデフォルトに
           socialLinks: {},
           favoriteGenres: [],
           songs: [],
@@ -134,6 +136,9 @@ export default function Dashboard() {
       ...userProfile,
       songs: [...userProfile.songs, newSong]
     })
+    
+    // 楽曲追加後は検索モーダルを閉じる
+    setShowMusicSearch(false)
   }
 
   const removeSong = (songId: string) => {
@@ -257,52 +262,103 @@ export default function Dashboard() {
                     placeholder="音楽の趣味について..."
                   />
                 </div>
+              </div>
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    テーマカラー
-                  </label>
-                  <p className="text-sm text-gray-600 mb-4">
-                    音楽名刺の配色テーマを選択してください。アイコンの枠線やボタンの色に反映されます。
-                  </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {THEME_COLORS.map((theme) => (
-                      <label key={theme.id} className="cursor-pointer">
-                        <input
-                          type="radio"
-                          name="themeColor"
-                          checked={userProfile.themeColor.id === theme.id}
-                          onChange={() => setUserProfile({
-                            ...userProfile,
-                            themeColor: theme
-                          })}
-                          className="sr-only"
-                        />
-                        <div className={`relative p-3 rounded-xl border-2 transition-all ${
-                          userProfile.themeColor.id === theme.id
-                            ? 'border-gray-400 ring-2 ring-blue-500/20 shadow-lg scale-105'
-                            : 'border-gray-200 hover:border-gray-300 hover:scale-102'
-                        }`}>
-                          {/* カラープレビュー */}
-                          <div className={`w-full h-8 rounded-lg bg-gradient-to-r ${theme.gradient} mb-2 shadow-sm`}></div>
-                          
-                          {/* テーマ名 */}
-                          <p className="text-center text-sm font-medium text-gray-800">{theme.name}</p>
-                          
-                          {/* 選択中インジケーター */}
-                          {userProfile.themeColor.id === theme.id && (
-                            <div className="absolute top-2 right-2">
-                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                              </div>
+            {/* ベースカラー選択 */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">ベースカラー</h2>
+              
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600 mb-4">
+                  音楽名刺の基本となる背景色を選択してください。
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {BASE_COLORS.map((baseColor) => (
+                    <label key={baseColor.id} className="cursor-pointer">
+                      <input
+                        type="radio"
+                        name="baseColor"
+                        checked={userProfile.baseColor.id === baseColor.id}
+                        onChange={() => setUserProfile({
+                          ...userProfile,
+                          baseColor: baseColor
+                        })}
+                        className="sr-only"
+                      />
+                      <div className={`relative p-4 rounded-xl border-2 transition-all ${
+                        userProfile.baseColor.id === baseColor.id
+                          ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg scale-105'
+                          : 'border-gray-200 hover:border-gray-300 hover:scale-102'
+                      }`}>
+                        {/* カラープレビュー */}
+                        <div className={`w-full h-8 rounded-lg ${baseColor.background} mb-2 shadow-sm`}></div>
+                        
+                        {/* テーマ名 */}
+                        <p className="text-center text-sm font-medium text-gray-800">{baseColor.name}</p>
+                        
+                        {/* 選択中インジケーター */}
+                        {userProfile.baseColor.id === baseColor.id && (
+                          <div className="absolute top-2 right-2">
+                            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
                             </div>
-                          )}
-                        </div>
-                      </label>
-                    ))}
-                  </div>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* テーマカラー選択 */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">テーマカラー</h2>
+              
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600 mb-4">
+                  アイコンの枠線やボタンの色に反映されるテーマカラーを選択してください。
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {THEME_COLORS.map((theme) => (
+                    <label key={theme.id} className="cursor-pointer">
+                      <input
+                        type="radio"
+                        name="themeColor"
+                        checked={userProfile.themeColor.id === theme.id}
+                        onChange={() => setUserProfile({
+                          ...userProfile,
+                          themeColor: theme
+                        })}
+                        className="sr-only"
+                      />
+                      <div className={`relative p-3 rounded-xl border-2 transition-all ${
+                        userProfile.themeColor.id === theme.id
+                          ? 'border-gray-400 ring-2 ring-blue-500/20 shadow-lg scale-105'
+                          : 'border-gray-200 hover:border-gray-300 hover:scale-102'
+                      }`}>
+                        {/* カラープレビュー */}
+                        <div className={`w-full h-8 rounded-lg bg-gradient-to-r ${theme.gradient} mb-2 shadow-sm`}></div>
+                        
+                        {/* テーマ名 */}
+                        <p className="text-center text-sm font-medium text-gray-800">{theme.name}</p>
+                        
+                        {/* 選択中インジケーター */}
+                        {userProfile.themeColor.id === theme.id && (
+                          <div className="absolute top-2 right-2">
+                            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
                 </div>
               </div>
             </div>
@@ -370,28 +426,30 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-
-            {/* 音楽追加 */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">音楽を追加</h2>
-              <MusicSearchAutocomplete
-                onSelect={handleMusicSelect}
-                placeholder="楽曲名やアーティスト名で検索..."
-              />
-            </div>
           </div>
 
           {/* 右側：楽曲リスト */}
           <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col h-full max-h-[calc(100vh-12rem)]">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">
-              楽曲リスト ({userProfile.songs.length})
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-800">
+                楽曲リスト ({userProfile.songs.length})
+              </h2>
+              <button
+                onClick={() => setShowMusicSearch(true)}
+                className="bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                曲を追加
+              </button>
+            </div>
             
             {userProfile.songs.length === 0 ? (
               <div className="text-center py-8 text-gray-500 flex-1 flex items-center justify-center flex-col">
                 <div className="text-4xl mb-4">🎵</div>
                 <p>まだ楽曲が追加されていません</p>
-                <p className="text-sm">左側の検索から楽曲を追加してみましょう</p>
+                <p className="text-sm">右上の「曲を追加」ボタンから楽曲を追加してみましょう</p>
               </div>
             ) : (
               <div className="flex-1 min-h-0">
@@ -424,6 +482,30 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+
+        {/* 楽曲検索モーダル */}
+        {showMusicSearch && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl p-6 max-w-md w-full">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-800">楽曲を追加</h3>
+                <button
+                  onClick={() => setShowMusicSearch(false)}
+                  className="text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <MusicSearchAutocomplete
+                onSelect={handleMusicSelect}
+                placeholder="楽曲名やアーティスト名で検索..."
+              />
+            </div>
+          </div>
+        )}
 
         {/* 共有セクション */}
         <div className="mt-8 bg-white rounded-xl shadow-lg p-6">

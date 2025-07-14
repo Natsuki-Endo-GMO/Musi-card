@@ -21,14 +21,25 @@ export interface Song {
   releaseYear?: number
 }
 
+export interface BaseColor {
+  id: string
+  name: string
+  background: string
+  textPrimary: string
+  textSecondary: string
+  surface: string
+  surfaceHover: string
+  border: string
+}
+
 export interface ThemeColor {
   id: string
   name: string
   gradient: string
   primary: string
   secondary: string
-  primaryHex: string    // 追加：実際の色の値
-  secondaryHex: string  // 追加：実際の色の値
+  primaryHex: string
+  secondaryHex: string
 }
 
 export interface SocialLinks {
@@ -53,6 +64,7 @@ export interface UserProfile {
   displayName: string
   bio: string
   icon?: string
+  baseColor: BaseColor
   themeColor: ThemeColor
   socialLinks: SocialLinks
   location?: string
@@ -75,17 +87,32 @@ export interface UserStats {
   averageReleaseYear: number
 }
 
+// ベースカラーの選択肢
+export const BASE_COLORS: BaseColor[] = [
+  {
+    id: 'light',
+    name: 'ライト',
+    background: 'bg-gradient-to-br from-gray-50 to-gray-100',
+    textPrimary: 'text-gray-800',
+    textSecondary: 'text-gray-600',
+    surface: 'bg-white/80',
+    surfaceHover: 'bg-gray-100',
+    border: 'border-gray-300'
+  },
+  {
+    id: 'dark',
+    name: 'ダーク',
+    background: 'bg-black',
+    textPrimary: 'text-white',
+    textSecondary: 'text-white/80',
+    surface: 'bg-white/10',
+    surfaceHover: 'bg-white/20',
+    border: 'border-white/20'
+  }
+]
+
 // テーマカラーの選択肢
 export const THEME_COLORS: ThemeColor[] = [
-  {
-    id: 'white',
-    name: 'ホワイト',
-    gradient: 'from-gray-50 to-gray-100',
-    primary: 'gray-600',
-    secondary: 'gray-100',
-    primaryHex: '#4B5563',
-    secondaryHex: '#F3F4F6'
-  },
   {
     id: 'blue',
     name: 'ブルー',

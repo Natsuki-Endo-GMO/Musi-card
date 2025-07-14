@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
-import { UserProfile, Song, THEME_COLORS, GRID_LAYOUTS } from '../types/user'
+import { UserProfile, Song, THEME_COLORS, BASE_COLORS, GRID_LAYOUTS } from '../types/user'
 import { storageService } from '../services/storageService'
 import YouTubePlayer from '../components/YouTubePlayer'
 import ShareProfile from '../components/ShareProfile'
@@ -97,7 +97,8 @@ export default function UserPage() {
             username,
             displayName: username,
             bio: '',
-            themeColor: THEME_COLORS[0],
+            baseColor: BASE_COLORS[0], // ライトベースをデフォルトに
+            themeColor: THEME_COLORS[0], // ブルーテーマをデフォルトに
             socialLinks: {},
             favoriteGenres: [],
             songs: staticUserSongs.map(song => ({
@@ -241,14 +242,13 @@ export default function UserPage() {
   }
 
   const theme = userProfile.themeColor || THEME_COLORS[0]
-  const isWhiteTheme = theme.id === 'white'
+  const baseColor = userProfile.baseColor || BASE_COLORS[0]
+  const isLightTheme = baseColor.id === 'light'
 
   return (
-    <div className={`min-h-screen relative overflow-hidden ${
-      isWhiteTheme ? 'bg-gradient-to-br from-gray-50 to-gray-100' : 'bg-black'
-    }`}>
+    <div className={`min-h-screen relative overflow-hidden ${baseColor.background}`}>
       {/* 背景グラデーション */}
-      {!isWhiteTheme && (
+      {!isLightTheme && (
         <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradient} opacity-30`}></div>
       )}
       
@@ -257,16 +257,16 @@ export default function UserPage() {
         <div className="flex items-center justify-between p-6">
           <button
             onClick={() => navigate('/')}
-            className={`flex items-center transition-all px-3 py-2 rounded-lg hover:bg-white/10 ${
-              isWhiteTheme ? 'text-gray-700 hover:bg-gray-200' : 'text-white'
+            className={`flex items-center transition-all px-3 py-2 rounded-lg ${
+              isLightTheme ? 'text-gray-700 hover:bg-gray-200' : 'text-white hover:bg-white/10'
             }`}
             onMouseEnter={(e) => {
-              if (!isWhiteTheme) {
+              if (!isLightTheme) {
                 e.currentTarget.style.color = theme.primaryHex
               }
             }}
             onMouseLeave={(e) => {
-              if (!isWhiteTheme) {
+              if (!isLightTheme) {
                 e.currentTarget.style.color = 'white'
               }
             }}
@@ -281,11 +281,11 @@ export default function UserPage() {
             {isPreviewMode && (
               <button
                 onClick={() => navigate('/dashboard')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  isWhiteTheme 
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg ${
+                  isLightTheme 
                     ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' 
                     : `bg-gradient-to-r ${theme.gradient} text-white hover:opacity-90`
-                } shadow-lg`}
+                }`}
               >
                 編集画面に戻る
               </button>
@@ -298,23 +298,23 @@ export default function UserPage() {
                   onClick={() => setShowStats(!showStats)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     showStats 
-                      ? (isWhiteTheme 
+                      ? (isLightTheme 
                           ? 'bg-gray-300 text-gray-700 shadow-lg' 
                           : `bg-gradient-to-r ${theme.gradient} text-white shadow-lg`)
-                      : (isWhiteTheme 
-                          ? 'bg-white/80 text-gray-700 border border-gray-300 hover:bg-gray-100' 
+                      : (isLightTheme 
+                          ? `${baseColor.surface} ${baseColor.textPrimary} ${baseColor.border} border hover:${baseColor.surfaceHover}` 
                           : 'bg-white/10 text-white border hover:border-transparent')
                   }`}
-                  style={!showStats && !isWhiteTheme ? {
+                  style={!showStats && !isLightTheme ? {
                     borderColor: theme.primaryHex + '50'
                   } as React.CSSProperties : {}}
                   onMouseEnter={(e) => {
-                    if (!showStats && !isWhiteTheme) {
+                    if (!showStats && !isLightTheme) {
                       e.currentTarget.style.background = `linear-gradient(to right, ${theme.primaryHex}, ${theme.primaryHex})`
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!showStats && !isWhiteTheme) {
+                    if (!showStats && !isLightTheme) {
                       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
                     }
                   }}
@@ -325,23 +325,23 @@ export default function UserPage() {
                   onClick={() => setShowShare(!showShare)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     showShare 
-                      ? (isWhiteTheme 
+                      ? (isLightTheme 
                           ? 'bg-gray-300 text-gray-700 shadow-lg' 
                           : `bg-gradient-to-r ${theme.gradient} text-white shadow-lg`)
-                      : (isWhiteTheme 
-                          ? 'bg-white/80 text-gray-700 border border-gray-300 hover:bg-gray-100' 
+                      : (isLightTheme 
+                          ? `${baseColor.surface} ${baseColor.textPrimary} ${baseColor.border} border hover:${baseColor.surfaceHover}` 
                           : 'bg-white/10 text-white border hover:border-transparent')
                   }`}
-                  style={!showShare && !isWhiteTheme ? {
+                  style={!showShare && !isLightTheme ? {
                     borderColor: theme.primaryHex + '50'
                   } as React.CSSProperties : {}}
                   onMouseEnter={(e) => {
-                    if (!showShare && !isWhiteTheme) {
+                    if (!showShare && !isLightTheme) {
                       e.currentTarget.style.background = `linear-gradient(to right, ${theme.primaryHex}, ${theme.primaryHex})`
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!showShare && !isWhiteTheme) {
+                    if (!showShare && !isLightTheme) {
                       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
                     }
                   }}
@@ -359,7 +359,7 @@ export default function UserPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {showStats && (
                 <div className={`backdrop-blur-sm rounded-xl p-6 ${
-                  isWhiteTheme ? 'bg-white/80 shadow-lg' : 'bg-white/10'
+                  isLightTheme ? 'bg-white/80 shadow-lg' : 'bg-white/10'
                 }`}>
                   {/* MusicStatsコンポーネントは削除されたため、ここには何も表示しない */}
                   {/* もしMusicStatsコンポーネントが再導入される場合は、ここに追加 */}
@@ -367,7 +367,7 @@ export default function UserPage() {
               )}
               {showShare && (
                 <div className={`backdrop-blur-sm rounded-xl p-6 ${
-                  isWhiteTheme ? 'bg-white/80 shadow-lg' : 'bg-white/10'
+                  isLightTheme ? 'bg-white/80 shadow-lg' : 'bg-white/10'
                 }`}>
                   <ShareProfile 
                     username={userProfile.username}
@@ -421,8 +421,8 @@ export default function UserPage() {
                   >
                     {isCenterCell ? (
                       /* 中央セル - プロフィールアイコン */
-                      <div className={`w-full h-full flex items-center justify-center ${
-                        isWhiteTheme ? 'bg-white/80 backdrop-blur-sm' : 'bg-black/10 backdrop-blur-sm'
+                      <div className={`w-full h-full flex items-center justify-center backdrop-blur-sm ${
+                        isLightTheme ? 'bg-white/80' : 'bg-black/10'
                       }`}>
                         {userProfile.icon ? (
                           <img 
@@ -443,7 +443,7 @@ export default function UserPage() {
                             className={`w-full h-full flex items-center justify-center rounded-lg shadow-xl ${
                               isOddGrid ? 'border-8' : 'border-4'
                             } ${
-                              isWhiteTheme 
+                              isLightTheme 
                                 ? 'bg-gradient-to-br from-gray-100 to-gray-200' 
                                 : 'bg-gradient-to-br from-white/20 to-white/10'
                             }`}
@@ -457,7 +457,7 @@ export default function UserPage() {
                             <div className={`font-bold ${
                               isOddGrid ? 'text-5xl' : 'text-4xl'
                             } ${
-                              isWhiteTheme ? 'text-gray-600' : 'text-white/60'
+                              isLightTheme ? 'text-gray-600' : 'text-white/60'
                             }`}>
                               {userProfile.displayName.charAt(0).toUpperCase()}
                             </div>
@@ -506,17 +506,13 @@ export default function UserPage() {
           
           {/* ユーザー名とプロフィール情報 */}
           <div className="text-center mt-12">
-            <h1 className={`text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 ${
-              isWhiteTheme ? 'text-gray-800' : 'text-white'
-            }`}>{userProfile.displayName}</h1>
+            <h1 className={`text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 ${baseColor.textPrimary}`}>
+              {userProfile.displayName}
+            </h1>
             {userProfile.bio && (
-              <p className={`text-lg mb-4 ${
-                isWhiteTheme ? 'text-gray-600' : 'text-white/80'
-              }`}>{userProfile.bio}</p>
+              <p className={`text-lg mb-4 ${baseColor.textSecondary}`}>{userProfile.bio}</p>
             )}
-            <div className={`flex items-center justify-center gap-6 ${
-              isWhiteTheme ? 'text-gray-500' : 'text-white/60'
-            }`}>
+            <div className={`flex items-center justify-center gap-6 ${baseColor.textSecondary}`}>
               <span>🎵 {userProfile.songs.length}曲</span>
               {userProfile.viewCount > 0 && <span>👁️ {userProfile.viewCount}回閲覧</span>}
               {userProfile.location && <span>📍 {userProfile.location}</span>}
@@ -531,7 +527,7 @@ export default function UserPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`p-3 rounded-full transition-colors ${
-                      isWhiteTheme 
+                      isLightTheme 
                         ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' 
                         : 'bg-white/10 backdrop-blur-sm text-white hover:bg-white/20'
                     }`}
@@ -547,7 +543,7 @@ export default function UserPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`p-3 rounded-full transition-colors ${
-                      isWhiteTheme 
+                      isLightTheme 
                         ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' 
                         : 'bg-white/10 backdrop-blur-sm text-white hover:bg-white/20'
                     }`}
@@ -563,7 +559,7 @@ export default function UserPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`p-3 rounded-full transition-colors ${
-                      isWhiteTheme 
+                      isLightTheme 
                         ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' 
                         : 'bg-white/10 backdrop-blur-sm text-white hover:bg-white/20'
                     }`}
