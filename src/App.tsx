@@ -8,6 +8,7 @@ import CreateUser from './pages/CreateUser'
 import ManageUsers from './pages/ManageUsers'
 import EditUser from './pages/EditUser'
 import SpotifyCallback from './pages/SpotifyCallback'
+import Migration from './pages/Migration'
 import StorageDebugPanel from './components/StorageDebugPanel'
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
         <Route path="/admin" element={<ManageUsers />} />
         <Route path="/edit/:username" element={<EditUser />} />
         <Route path="/callback" element={<SpotifyCallback />} />
+        <Route path="/migration" element={<Migration />} />
       </Routes>
       <StorageDebugPanel />
     </>
