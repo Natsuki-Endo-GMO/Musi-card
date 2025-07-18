@@ -10,6 +10,7 @@ import EditUser from './pages/EditUser'
 import SpotifyCallback from './pages/SpotifyCallback'
 import Migration from './pages/Migration'
 import StorageDebugPanel from './components/StorageDebugPanel'
+import DataSourceIndicator from './components/DataSourceIndicator'
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
         <Route path="/migration" element={<Migration />} />
       </Routes>
       <StorageDebugPanel />
+      <DataSourceIndicator />
     </>
   )
 }
