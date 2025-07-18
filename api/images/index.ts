@@ -1,7 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { put, del, list } from '@vercel/blob';
-import { requireAuth, requireAdmin, AuthenticatedRequest } from '../middleware/auth';
-import { validateFilename, validateImageData, validateUrl } from '../utils/validation';
 
 const BLOB_READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
 
@@ -9,7 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS設定
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -20,13 +18,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     switch (action) {
       case 'upload':
-        return await requireAuth(handleUpload)(req as AuthenticatedRequest, res);
+        return await handleUpload(req, res);
       case 'delete':
-        return await requireAuth(handleDelete)(req as AuthenticatedRequest, res);
+        return await handleDelete(req, res);
       case 'cleanup':
-        return await requireAdmin(handleCleanup)(req as AuthenticatedRequest, res);
+        return await handleCleanup(req, res);
       case 'stats':
-        return await requireAuth(handleStats)(req as AuthenticatedRequest, res);
+        return await handleStats(req, res);
       default:
         return res.status(400).json({ error: 'Invalid action' });
     }
@@ -39,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 // 画像アップロード
-async function handleUpload(req: AuthenticatedRequest, res: VercelResponse): Promise<void> {
+async function handleUpload(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
