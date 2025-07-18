@@ -38,7 +38,7 @@ export default function DataMigration() {
       console.log('📦 マイグレーション対象データ:', localStorageData);
 
       // マイグレーションAPIを呼び出し
-      const response = await fetch('/api/db/migrate', {
+      const response = await fetch('/api/db?action=migrate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

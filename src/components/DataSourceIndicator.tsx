@@ -57,7 +57,7 @@ export default function DataSourceIndicator() {
       };
 
       try {
-        const response = await fetch('/api/db/users');
+        const response = await fetch('/api/db?action=users');
         if (response.ok) {
           const data = await response.json();
           databaseInfo = {

@@ -1,11 +1,32 @@
-// Spotify API設定（公開情報なのでVITE_でOK）
-const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
+// Spotify API設定（API経由で取得）
+let CLIENT_ID = '';
+let REDIRECT_URI = '';
+
+// 設定をAPIから取得
+async function loadSpotifyConfig() {
+  try {
+    const response = await fetch('/api/config?type=spotify');
+    const config = await response.json();
+    CLIENT_ID = config.clientId;
+    REDIRECT_URI = config.redirectUri;
+  } catch (error) {
+    console.error('Spotify設定の取得に失敗:', error);
+    // フォールバック（開発環境のみ）
+    if (import.meta.env.DEV) {
+      CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID || '';
+      REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || '';
+    }
+  }
+}
+
+// 初期化時に設定を読み込み
+loadSpotifyConfig();
 
 // 環境に応じたコールバックURL生成
 const getRedirectUri = (): string => {
-  // 環境変数で明示的に指定されている場合はそれを使用（公開情報なのでVITE_でOK）
-  if (import.meta.env.VITE_SPOTIFY_REDIRECT_URI) {
-    return import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
+  // APIから取得した設定を優先
+  if (REDIRECT_URI) {
+    return REDIRECT_URI;
   }
   
   // Vercel環境の検出（本番環境）
@@ -31,7 +52,7 @@ const getRedirectUri = (): string => {
   // フォールバック（SSR環境など）
   // 本番環境では環境変数設定を強制
   if (import.meta.env.PROD) {
-    throw new Error('本番環境では VITE_SPOTIFY_REDIRECT_URI を設定してください');
+    throw new Error('本番環境では SPOTIFY_REDIRECT_URI を設定してください');
   }
   
   return 'http://127.0.0.1:5173/callback';
@@ -129,7 +150,7 @@ export const spotifyAuth = {
         hostname: typeof window !== 'undefined' ? window.location.hostname : 'SSR',
         protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown',
         port: typeof window !== 'undefined' ? window.location.port : 'unknown',
-        envVar: import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'not set',
+        envVar: REDIRECT_URI || 'not set',
         state: state
       });
     }
