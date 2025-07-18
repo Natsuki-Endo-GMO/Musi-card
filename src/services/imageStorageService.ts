@@ -1,18 +1,7 @@
-import { put, del, list } from '@vercel/blob'
-import { processImage, validateImageSize, validateImageFormat, generateSafeFileName, IMAGE_PRESETS, ProcessedImage } from '../utils/imageProcessor'
+import { validateImageSize, validateImageFormat } from '../utils/imageProcessor'
 
-// Vercel Blob Storage設定
-const BLOB_READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || process.env.VITE_BLOB_READ_WRITE_TOKEN
-
-if (!BLOB_READ_WRITE_TOKEN) {
-  console.warn('⚠️ BLOB_READ_WRITE_TOKENが設定されていません。画像ストレージ機能が無効になります。')
-}
-
-// 本番環境での画像処理を無効化（Vercelの制限のため）
-const isProduction = process.env.NODE_ENV === 'production'
-
-// 環境変数が設定されていない場合は常にフォールバック
-const useFallback = !BLOB_READ_WRITE_TOKEN || isProduction
+// API Route経由での画像アップロード
+const UPLOAD_API_URL = '/api/upload/image'
 
 export interface ImageUploadResult {
   url: string
@@ -41,10 +30,43 @@ export class ImageStorageService {
   }
 
   /**
-   * Blob Storageが利用可能かチェック
+   * API Route経由で画像をアップロード
    */
-  private isBlobStorageAvailable(): boolean {
-    return !!BLOB_READ_WRITE_TOKEN && !useFallback
+  private async uploadViaAPI(buffer: Buffer, username: string, type: 'icon' | 'album'): Promise<ImageUploadResult> {
+    try {
+      const base64 = buffer.toString('base64')
+      
+      const response = await fetch(UPLOAD_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image: base64,
+          username,
+          type
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`アップロードに失敗しました: ${response.status}`)
+      }
+
+      const data = await response.json()
+      
+      console.log(`[API画像アップロード成功] ユーザー: ${username}, タイプ: ${type}, URL: ${data.url}`)
+      
+      return {
+        url: data.url,
+        size: buffer.length,
+        width: 0,
+        height: 0,
+        format: 'jpeg'
+      }
+    } catch (error) {
+      console.error('API画像アップロードエラー:', error)
+      throw error
+    }
   }
 
   /**
@@ -52,63 +74,21 @@ export class ImageStorageService {
    */
   async uploadUserIcon(file: File, username: string): Promise<ImageUploadResult> {
     try {
-      // Blob Storageが利用できない場合はフォールバック
-      if (!this.isBlobStorageAvailable()) {
-        console.warn('⚠️ Blob Storageが利用できません。ローカル保存を使用します。')
-        return this.fallbackUpload(file, username, 'icon')
-      }
-
       // バリデーション
       if (!validateImageFormat(file.type)) {
         throw new Error('サポートされていない画像形式です')
       }
 
-      if (!validateImageSize(await file.arrayBuffer().then(buf => Buffer.from(buf)))) {
+      const buffer = Buffer.from(await file.arrayBuffer())
+      if (!validateImageSize(buffer)) {
         throw new Error('ファイルサイズが大きすぎます（最大5MB）')
       }
 
-      // 画像処理（本番環境ではスキップ）
-      const buffer = Buffer.from(await file.arrayBuffer())
-      let processed: ProcessedImage
-      
-      if (isProduction) {
-        // 本番環境では画像処理をスキップ
-        processed = {
-          buffer,
-          format: file.type.split('/')[1] || 'jpeg',
-          size: buffer.length,
-          width: 0,
-          height: 0
-        }
-      } else {
-        processed = await processImage(buffer, IMAGE_PRESETS.userIcon)
-      }
-
-      // ファイル名生成
-      const fileName = generateSafeFileName(file.name, username, 'icon')
-
-      // Blobにアップロード
-      const { url } = await put(fileName, processed.buffer, {
-        access: 'public',
-        addRandomSuffix: false,
-        contentType: `image/${processed.format}`
-      })
-
-      // キャッシュに保存
-      this.uploadCache.set(fileName, url)
-
-      console.log(`[画像保存] ユーザー: ${username}, ファイル名: ${fileName}, サイズ: ${processed.size}, URL: ${url}`)
-
-      return {
-        url,
-        size: processed.size,
-        width: processed.width,
-        height: processed.height,
-        format: processed.format
-      }
+      // API Route経由でアップロード
+      return await this.uploadViaAPI(buffer, username, 'icon')
     } catch (error) {
       console.error('ユーザーアイコンアップロードエラー:', error)
-      // エラーの場合はフォールバック
+      // フォールバック: ローカル保存
       return this.fallbackUpload(file, username, 'icon')
     }
   }
@@ -118,63 +98,21 @@ export class ImageStorageService {
    */
   async uploadAlbumCover(file: File, username: string, songId: string): Promise<ImageUploadResult> {
     try {
-      // Blob Storageが利用できない場合はフォールバック
-      if (!this.isBlobStorageAvailable()) {
-        console.warn('⚠️ Blob Storageが利用できません。ローカル保存を使用します。')
-        return this.fallbackUpload(file, username, 'album')
-      }
-
       // バリデーション
       if (!validateImageFormat(file.type)) {
         throw new Error('サポートされていない画像形式です')
       }
 
-      if (!validateImageSize(await file.arrayBuffer().then(buf => Buffer.from(buf)))) {
+      const buffer = Buffer.from(await file.arrayBuffer())
+      if (!validateImageSize(buffer)) {
         throw new Error('ファイルサイズが大きすぎます（最大5MB）')
       }
 
-      // 画像処理（本番環境ではスキップ）
-      const buffer = Buffer.from(await file.arrayBuffer())
-      let processed: ProcessedImage
-      
-      if (isProduction) {
-        // 本番環境では画像処理をスキップ
-        processed = {
-          buffer,
-          format: file.type.split('/')[1] || 'jpeg',
-          size: buffer.length,
-          width: 0,
-          height: 0
-        }
-      } else {
-        processed = await processImage(buffer, IMAGE_PRESETS.albumCover)
-      }
-
-      // ファイル名生成
-      const fileName = generateSafeFileName(file.name, username, 'album')
-
-      // Blobにアップロード
-      const { url } = await put(fileName, processed.buffer, {
-        access: 'public',
-        addRandomSuffix: false,
-        contentType: `image/${processed.format}`
-      })
-
-      // キャッシュに保存
-      this.uploadCache.set(fileName, url)
-
-      console.log(`[画像保存] ユーザー: ${username}, ファイル名: ${fileName}, サイズ: ${processed.size}, URL: ${url}`)
-
-      return {
-        url,
-        size: processed.size,
-        width: processed.width,
-        height: processed.height,
-        format: processed.format
-      }
+      // API Route経由でアップロード
+      return await this.uploadViaAPI(buffer, username, 'album')
     } catch (error) {
       console.error('アルバムジャケットアップロードエラー:', error)
-      // エラーの場合はフォールバック
+      // フォールバック: ローカル保存
       return this.fallbackUpload(file, username, 'album')
     }
   }
@@ -184,12 +122,6 @@ export class ImageStorageService {
    */
   async uploadFromUrl(imageUrl: string, username: string, type: 'icon' | 'album'): Promise<ImageUploadResult> {
     try {
-      // Blob Storageが利用できない場合はフォールバック
-      if (!this.isBlobStorageAvailable()) {
-        console.warn('⚠️ Blob Storageが利用できません。元のURLを返します。')
-        return this.fallbackUrlUpload(imageUrl, username, type)
-      }
-
       // 外部URLから画像を取得
       const response = await fetch(imageUrl)
       if (!response.ok) {
@@ -198,45 +130,11 @@ export class ImageStorageService {
 
       const buffer = Buffer.from(await response.arrayBuffer())
 
-      // 画像処理（本番環境ではスキップ）
-      let processed: ProcessedImage
-      
-      if (isProduction) {
-        // 本番環境では画像処理をスキップ
-        processed = {
-          buffer,
-          format: 'jpeg',
-          size: buffer.length,
-          width: 0,
-          height: 0
-        }
-      } else {
-        const preset = type === 'icon' ? IMAGE_PRESETS.userIcon : IMAGE_PRESETS.albumCover
-        processed = await processImage(buffer, preset)
-      }
-
-      // ファイル名生成
-      const fileName = generateSafeFileName(`external-${Date.now()}`, username, type)
-
-      // Blobにアップロード
-      const { url } = await put(fileName, processed.buffer, {
-        access: 'public',
-        addRandomSuffix: false,
-        contentType: `image/${processed.format}`
-      })
-
-      console.log(`📤 外部画像をアップロード: ${username}/${type} (${processed.size} bytes)`)
-
-      return {
-        url,
-        size: processed.size,
-        width: processed.width,
-        height: processed.height,
-        format: processed.format
-      }
+      // API Route経由でアップロード
+      return await this.uploadViaAPI(buffer, username, type)
     } catch (error) {
       console.error('外部画像アップロードエラー:', error)
-      // エラーの場合はフォールバック
+      // フォールバック: 元のURLを返す
       return this.fallbackUrlUpload(imageUrl, username, type)
     }
   }
@@ -245,6 +143,7 @@ export class ImageStorageService {
    * フォールバックアップロード（ローカル保存）
    */
   private async fallbackUpload(file: File, username: string, type: 'icon' | 'album'): Promise<ImageUploadResult> {
+    console.warn('⚠️ API Routeが利用できません。ローカル保存を使用します。')
     return new Promise((resolve) => {
       const reader = new FileReader()
       reader.onload = (e) => {
@@ -265,6 +164,7 @@ export class ImageStorageService {
    * フォールバックURLアップロード（元のURLを返す）
    */
   private async fallbackUrlUpload(imageUrl: string, username: string, type: 'icon' | 'album'): Promise<ImageUploadResult> {
+    console.warn('⚠️ API Routeが利用できません。元のURLを使用します。')
     return {
       url: imageUrl,
       size: 0,
@@ -279,15 +179,20 @@ export class ImageStorageService {
    */
   async deleteImage(url: string): Promise<boolean> {
     try {
-      // Blob Storageが利用できない場合はスキップ
-      if (!this.isBlobStorageAvailable()) {
-        console.warn('⚠️ Blob Storageが利用できません。削除をスキップします。')
-        return true
-      }
+      const response = await fetch('/api/delete/image', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url })
+      })
 
-      await del(url)
-      console.log(`🗑️ 画像を削除: ${url}`)
-      return true
+      if (response.ok) {
+        console.log(`🗑️ 画像を削除: ${url}`)
+        return true
+      } else {
+        throw new Error(`削除に失敗: ${response.status}`)
+      }
     } catch (error) {
       console.error('画像削除エラー:', error)
       return false
@@ -295,113 +200,35 @@ export class ImageStorageService {
   }
 
   /**
-   * ユーザーの画像一覧を取得
+   * 画像統計を取得
    */
-  async getUserImages(username: string): Promise<string[]> {
-    try {
-      // Blob Storageが利用できない場合は空配列を返す
-      if (!this.isBlobStorageAvailable()) {
-        console.warn('⚠️ Blob Storageが利用できません。画像一覧を取得できません。')
-        return []
-      }
-
-      const { blobs } = await list({
-        prefix: `${username}/`,
-        limit: 100
-      })
-
-      return blobs.map(blob => blob.url)
-    } catch (error) {
-      console.error('ユーザー画像一覧取得エラー:', error)
-      return []
+  async getStats(): Promise<ImageStorageStats> {
+    // TODO: API Route経由で統計情報を取得
+    return {
+      totalFiles: 0,
+      totalSize: 0,
+      userIcons: 0,
+      albumCovers: 0
     }
   }
 
   /**
-   * ストレージ統計を取得
-   */
-  async getStorageStats(): Promise<ImageStorageStats> {
-    try {
-      // Blob Storageが利用できない場合はデフォルト値を返す
-      if (!this.isBlobStorageAvailable()) {
-        console.warn('⚠️ Blob Storageが利用できません。統計情報を取得できません。')
-        return {
-          totalFiles: 0,
-          totalSize: 0,
-          userIcons: 0,
-          albumCovers: 0
-        }
-      }
-
-      const { blobs } = await list({
-        limit: 1000
-      })
-
-      let totalSize = 0
-      let userIcons = 0
-      let albumCovers = 0
-
-      blobs.forEach(blob => {
-        totalSize += blob.size || 0
-        if (blob.pathname.includes('/icon/')) {
-          userIcons++
-        } else if (blob.pathname.includes('/album/')) {
-          albumCovers++
-        }
-      })
-
-      return {
-        totalFiles: blobs.length,
-        totalSize,
-        userIcons,
-        albumCovers
-      }
-    } catch (error) {
-      console.error('ストレージ統計取得エラー:', error)
-      return {
-        totalFiles: 0,
-        totalSize: 0,
-        userIcons: 0,
-        albumCovers: 0
-      }
-    }
-  }
-
-  /**
-   * 古い画像をクリーンアップ（30日以上前）
+   * 古い画像をクリーンアップ
    */
   async cleanupOldImages(): Promise<number> {
     try {
-      // Blob Storageが利用できない場合はスキップ
-      if (!this.isBlobStorageAvailable()) {
-        console.warn('⚠️ Blob Storageが利用できません。クリーンアップをスキップします。')
-        return 0
-      }
-
-      const thirtyDaysAgo = new Date()
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
-      const { blobs } = await list({
-        limit: 1000
+      const response = await fetch('/api/cleanup/images', {
+        method: 'POST'
       })
 
-      let deletedCount = 0
-
-      for (const blob of blobs) {
-        if (blob.uploadedAt && new Date(blob.uploadedAt) < thirtyDaysAgo) {
-          try {
-            await del(blob.url)
-            deletedCount++
-          } catch (error) {
-            console.error(`古い画像削除エラー: ${blob.url}`, error)
-          }
-        }
+      if (response.ok) {
+        const data = await response.json()
+        console.log(`🧹 ${data.deletedCount}件の古い画像を削除しました`)
+        return data.deletedCount
       }
-
-      console.log(`🧹 古い画像を${deletedCount}件削除しました`)
-      return deletedCount
+      return 0
     } catch (error) {
-      console.error('古い画像クリーンアップエラー:', error)
+      console.error('クリーンアップエラー:', error)
       return 0
     }
   }
