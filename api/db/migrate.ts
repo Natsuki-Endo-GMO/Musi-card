@@ -4,6 +4,11 @@ import fs from 'fs';
 import path from 'path';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // 本番環境では無効化
+  if (process.env.NODE_ENV === 'production' && process.env.VITE_ENABLE_DATA_MIGRATION !== 'true') {
+    return res.status(403).json({ error: 'Data migration is disabled in production' });
+  }
+
   // CORS設定
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');

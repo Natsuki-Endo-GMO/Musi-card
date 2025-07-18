@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { loadAllUsers } from '../utils/userData';
+import { useAppConfig } from '../hooks/useAppConfig';
 
 interface DataSourceInfo {
   localStorage: {
@@ -17,6 +18,13 @@ interface DataSourceInfo {
 }
 
 export default function DataSourceIndicator() {
+  const { config, loading: configLoading } = useAppConfig();
+
+  // 設定が読み込まれていない、または無効化されている場合は表示しない
+  if (configLoading || !config?.enableDataSourceIndicator) {
+    return null;
+  }
+
   const [dataSourceInfo, setDataSourceInfo] = useState<DataSourceInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 

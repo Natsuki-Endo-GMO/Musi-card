@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAdminConfig } from '../hooks/useAdminConfig'
 
 export default function Login() {
   const navigate = useNavigate()
+  const { config: adminConfig } = useAdminConfig()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -57,8 +59,8 @@ export default function Login() {
   }
 
   const isAdmin = (user: string): boolean => {
-    // 管理者判定（環境変数で設定可能）
-    const adminUsers = (import.meta.env.VITE_ADMIN_USERS || 'admin').split(',')
+    // 管理者判定（サーバーサイド設定を使用）
+    const adminUsers = adminConfig?.adminUsers || ['admin']
     return adminUsers.includes(user.toLowerCase())
   }
 
@@ -181,7 +183,7 @@ export default function Login() {
           <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs">
             <p className="text-yellow-800 font-medium">🔧 開発モード</p>
             <p className="text-yellow-700">
-              管理者ユーザー: {import.meta.env.VITE_ADMIN_USERS || 'admin'}
+              管理者ユーザー: {adminConfig?.adminUsers?.join(', ') || 'admin'}
             </p>
           </div>
         )}

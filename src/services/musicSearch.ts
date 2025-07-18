@@ -56,11 +56,11 @@ export const setMusicProvider = (provider: MusicProvider) => {
 export const getCurrentProvider = (): MusicProvider => currentProvider
 
 // Last.fm API設定
-const LASTFM_API_KEY = import.meta.env.VITE_LASTFM_API_KEY || 'YOUR_LASTFM_API_KEY'
+const LASTFM_API_KEY = import.meta.env.VITE_LASTFM_API_KEY || 'YOUR_LASTFM_API_KEY' // 公開APIキーなのでVITE_でOK
 const LASTFM_BASE_URL = 'https://ws.audioscrobbler.com/2.0/'
 
 // Spotify API設定
-const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID || ''
+const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID || '' // 公開情報なのでVITE_でOK
 const REDIRECT_URI = `${window.location.origin}/callback`
 const SCOPES = 'user-read-private user-read-email'
 
@@ -177,7 +177,7 @@ export async function exchangeCodeForTokens(code: string, state: string): Promis
     localStorage.removeItem('spotify_auth_timestamp')
   }
   
-  const redirectUri = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:5173/callback'
+  const redirectUri = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:5173/callback' // 公開情報なのでVITE_でOK
   
   console.log('🔄 トークン交換リクエスト開始...')
   console.log(`   Redirect URI: ${redirectUri}`)
@@ -189,7 +189,7 @@ export async function exchangeCodeForTokens(code: string, state: string): Promis
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${import.meta.env.VITE_SPOTIFY_CLIENT_SECRET || ''}`)}`
+        'Authorization': `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${import.meta.env.VITE_SPOTIFY_CLIENT_SECRET || ''}`)}` // 注意: シークレットはサーバーサイドで処理すべき
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',

@@ -1,7 +1,35 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAppConfig } from '../hooks/useAppConfig'
+import { useAdminConfig } from '../hooks/useAdminConfig'
 
 export default function AdminLogin() {
+  const { config: appConfig, loading: appConfigLoading } = useAppConfig();
+  const { config: adminConfig, loading: adminConfigLoading } = useAdminConfig();
+
+  // 設定が読み込まれていない場合は表示しない
+  if (appConfigLoading || adminConfigLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!appConfig?.enableAdminPanel) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">アクセスできません</h1>
+          <p className="text-gray-600">管理者機能は現在利用できません。</p>
+        </div>
+      </div>
+    );
+  }
+
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -15,7 +43,7 @@ export default function AdminLogin() {
     
     try {
       // 管理者ユーザーかチェック
-      const adminUsers = (import.meta.env.VITE_ADMIN_USERS || 'admin').split(',')
+      const adminUsers = adminConfig?.adminUsers || ['admin']
       if (!adminUsers.includes(username.toLowerCase())) {
         alert('❌ 管理者権限がありません')
         return
@@ -150,7 +178,7 @@ export default function AdminLogin() {
           <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs">
             <p className="text-yellow-800 font-medium">🔧 開発モード</p>
             <p className="text-yellow-700">
-              許可された管理者: {import.meta.env.VITE_ADMIN_USERS || 'admin'}
+              許可された管理者: {adminConfig?.adminUsers?.join(', ') || 'admin'}
             </p>
           </div>
         )}

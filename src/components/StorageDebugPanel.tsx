@@ -1,7 +1,15 @@
 import { useState, useEffect } from 'react'
 import { storageService, getStorageProviderInfo, switchStorageProvider, StorageProvider } from '../services/storageService'
+import { useAppConfig } from '../hooks/useAppConfig'
 
 export default function StorageDebugPanel() {
+  const { config, loading: configLoading } = useAppConfig();
+
+  // 設定が読み込まれていない、または無効化されている場合は表示しない
+  if (configLoading || !config?.enableDebugPanels) {
+    return null;
+  }
+
   const [isOpen, setIsOpen] = useState(false)
   const [storageInfo, setStorageInfo] = useState(getStorageProviderInfo())
   const [userCount, setUserCount] = useState(0)
@@ -27,9 +35,9 @@ export default function StorageDebugPanel() {
     }, 1000)
   }
 
-  // 開発環境でのみ表示
-  if (!import.meta.env.DEV || !import.meta.env.VITE_DEBUG_STORAGE) {
-    return null
+  // 設定が読み込まれていない、または無効化されている場合は表示しない
+  if (configLoading || !config?.enableDebugPanels) {
+    return null;
   }
 
   return (

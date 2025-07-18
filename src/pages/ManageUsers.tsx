@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import DataManager from '../components/DataManager'
 import { getUserList, deleteUser as deleteUserData } from '../utils/userData'
+import { useAppConfig } from '../hooks/useAppConfig'
+import { useAdminConfig } from '../hooks/useAdminConfig'
 
 interface UserInfo {
   username: string
@@ -12,6 +14,32 @@ interface UserInfo {
 }
 
 export default function ManageUsers() {
+  const { config: appConfig, loading: appConfigLoading } = useAppConfig();
+  const { config: adminConfig, loading: adminConfigLoading } = useAdminConfig();
+
+  // 設定が読み込まれていない場合は表示しない
+  if (appConfigLoading || adminConfigLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!appConfig?.enableAdminPanel) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">アクセスできません</h1>
+          <p className="text-gray-600">管理者機能は現在利用できません。</p>
+        </div>
+      </div>
+    );
+  }
+
   const navigate = useNavigate()
   const [users, setUsers] = useState<UserInfo[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,7 +74,7 @@ export default function ManageUsers() {
     }
 
     // 管理者ユーザーの確認
-    const adminUsers = (import.meta.env.VITE_ADMIN_USERS || 'admin').split(',')
+    const adminUsers = adminConfig?.adminUsers || ['admin']
     if (!adminUsers.includes(adminUser)) {
       console.warn('🛡️ 管理者権限が無効です')
       navigate('/admin-login')

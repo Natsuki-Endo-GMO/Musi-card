@@ -441,7 +441,7 @@ export default function IconUpload({ onIconChange, currentIcon, className = '', 
           )}
 
           {/* デバッグ情報パネル */}
-          {process.env.NODE_ENV === 'development' && (() => {
+          {(!import.meta.env.PROD || import.meta.env.VITE_ENABLE_DEBUG_PANELS === 'true') && (() => {
             const imageSize = getCurrentImageSize()
             const naturalSize = imageRef.current ? {
               width: imageRef.current.naturalWidth,

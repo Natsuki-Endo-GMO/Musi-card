@@ -212,8 +212,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* デバッグコンポーネント（開発環境のみ） */}
-        {process.env.NODE_ENV === 'development' && <ImageStorageDebug />}
+        {/* デバッグコンポーネント（本番環境では無効化） */}
+        {(!import.meta.env.PROD || import.meta.env.VITE_ENABLE_DEBUG_PANELS === 'true') && <ImageStorageDebug />}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* 左側：プロフィール編集 */}

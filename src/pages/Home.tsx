@@ -129,18 +129,20 @@ export default function Home() {
           </div>
         )}
 
-        {/* 管理者ボタン（目立たない場所） */}
-        <div className="mt-16 pt-8 border-t border-gray-200/50">
-          <div className="text-center">
-            <button
-              onClick={() => navigate('/admin-login')}
-              className="text-xs text-gray-300 hover:text-gray-500 transition-colors px-2 py-1 rounded opacity-50 hover:opacity-100"
-              title="管理者ログイン"
-            >
-              ⚙️
-            </button>
+        {/* 管理者ボタン（本番環境では無効化） */}
+        {(!import.meta.env.PROD || import.meta.env.VITE_ENABLE_ADMIN_PANEL === 'true') && (
+          <div className="mt-16 pt-8 border-t border-gray-200/50">
+            <div className="text-center">
+              <button
+                onClick={() => navigate('/admin-login')}
+                className="text-xs text-gray-300 hover:text-gray-500 transition-colors px-2 py-1 rounded opacity-50 hover:opacity-100"
+                title="管理者ログイン"
+              >
+                ⚙️
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

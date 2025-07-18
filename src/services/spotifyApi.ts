@@ -1,9 +1,9 @@
-// Spotify API設定
+// Spotify API設定（公開情報なのでVITE_でOK）
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 
 // 環境に応じたコールバックURL生成
 const getRedirectUri = (): string => {
-  // 環境変数で明示的に指定されている場合はそれを使用
+  // 環境変数で明示的に指定されている場合はそれを使用（公開情報なのでVITE_でOK）
   if (import.meta.env.VITE_SPOTIFY_REDIRECT_URI) {
     return import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
   }

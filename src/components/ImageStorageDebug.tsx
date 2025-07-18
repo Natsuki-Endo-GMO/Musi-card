@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react'
 import { imageStorageService } from '../services/imageStorageService'
 import { externalImageCacheService } from '../services/externalImageCacheService'
+import { useAppConfig } from '../hooks/useAppConfig'
 
 export default function ImageStorageDebug() {
+  const { config, loading: configLoading } = useAppConfig();
+
+  // 設定が読み込まれていない、または無効化されている場合は表示しない
+  if (configLoading || !config?.enableDebugPanels) {
+    return null;
+  }
+
   const [storageStats, setStorageStats] = useState<any>(null)
   const [cacheStats, setCacheStats] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -52,8 +60,9 @@ export default function ImageStorageDebug() {
     loadStats()
   }, [])
 
-  if (process.env.NODE_ENV !== 'development') {
-    return null
+  // 設定が読み込まれていない、または無効化されている場合は表示しない
+  if (configLoading || !config?.enableDebugPanels) {
+    return null;
   }
 
   return (
