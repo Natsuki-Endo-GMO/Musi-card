@@ -151,8 +151,17 @@ export async function processImage(
 /**
  * 画像のサイズを検証する
  */
-export function validateImageSize(buffer: Buffer, maxSizeMB: number = 5): boolean {
-  const sizeInMB = buffer.length / (1024 * 1024)
+export function validateImageSize(data: ArrayBuffer | Uint8Array | any, maxSizeMB: number = 5): boolean {
+  let size: number
+  if (data instanceof ArrayBuffer) {
+    size = data.byteLength
+  } else if (data instanceof Uint8Array) {
+    size = data.byteLength
+  } else {
+    // Buffer type
+    size = data.length || 0
+  }
+  const sizeInMB = size / (1024 * 1024)
   return sizeInMB <= maxSizeMB
 }
 

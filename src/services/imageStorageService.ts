@@ -32,9 +32,15 @@ export class ImageStorageService {
   /**
    * API Route経由で画像をアップロード
    */
-  private async uploadViaAPI(buffer: Buffer, username: string, type: 'icon' | 'album'): Promise<ImageUploadResult> {
+  private async uploadViaAPI(arrayBuffer: ArrayBuffer, username: string, type: 'icon' | 'album'): Promise<ImageUploadResult> {
     try {
-      const base64 = buffer.toString('base64')
+      // ArrayBufferをBase64に変換
+      const bytes = new Uint8Array(arrayBuffer)
+      let binary = ''
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i])
+      }
+      const base64 = btoa(binary)
       
       const response = await fetch(UPLOAD_API_URL, {
         method: 'POST',
@@ -58,7 +64,7 @@ export class ImageStorageService {
       
       return {
         url: data.url,
-        size: buffer.length,
+        size: arrayBuffer.byteLength,
         width: 0,
         height: 0,
         format: 'jpeg'
@@ -79,13 +85,13 @@ export class ImageStorageService {
         throw new Error('サポートされていない画像形式です')
       }
 
-      const buffer = Buffer.from(await file.arrayBuffer())
-      if (!validateImageSize(buffer)) {
+      const arrayBuffer = await file.arrayBuffer()
+      if (!validateImageSize(new Uint8Array(arrayBuffer))) {
         throw new Error('ファイルサイズが大きすぎます（最大5MB）')
       }
 
       // API Route経由でアップロード
-      return await this.uploadViaAPI(buffer, username, 'icon')
+      return await this.uploadViaAPI(arrayBuffer, username, 'icon')
     } catch (error) {
       console.error('ユーザーアイコンアップロードエラー:', error)
       // フォールバック: ローカル保存
@@ -103,13 +109,13 @@ export class ImageStorageService {
         throw new Error('サポートされていない画像形式です')
       }
 
-      const buffer = Buffer.from(await file.arrayBuffer())
-      if (!validateImageSize(buffer)) {
+      const arrayBuffer = await file.arrayBuffer()
+      if (!validateImageSize(arrayBuffer)) {
         throw new Error('ファイルサイズが大きすぎます（最大5MB）')
       }
 
       // API Route経由でアップロード
-      return await this.uploadViaAPI(buffer, username, 'album')
+      return await this.uploadViaAPI(arrayBuffer, username, 'album')
     } catch (error) {
       console.error('アルバムジャケットアップロードエラー:', error)
       // フォールバック: ローカル保存
@@ -128,10 +134,10 @@ export class ImageStorageService {
         throw new Error('画像の取得に失敗しました')
       }
 
-      const buffer = Buffer.from(await response.arrayBuffer())
+      const arrayBuffer = await response.arrayBuffer()
 
       // API Route経由でアップロード
-      return await this.uploadViaAPI(buffer, username, type)
+      return await this.uploadViaAPI(arrayBuffer, username, type)
     } catch (error) {
       console.error('外部画像アップロードエラー:', error)
       // フォールバック: 元のURLを返す
