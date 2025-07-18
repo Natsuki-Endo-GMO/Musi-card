@@ -203,12 +203,24 @@ export class ImageStorageService {
    * 画像統計を取得
    */
   async getStats(): Promise<ImageStorageStats> {
-    // TODO: API Route経由で統計情報を取得
-    return {
-      totalFiles: 0,
-      totalSize: 0,
-      userIcons: 0,
-      albumCovers: 0
+    try {
+      const response = await fetch('/api/stats/images')
+      
+      if (response.ok) {
+        const stats = await response.json()
+        console.log(`[統計取得成功] ファイル数: ${stats.totalFiles}, サイズ: ${stats.totalSize}`)
+        return stats
+      } else {
+        throw new Error(`統計取得に失敗: ${response.status}`)
+      }
+    } catch (error) {
+      console.error('統計取得エラー:', error)
+      return {
+        totalFiles: 0,
+        totalSize: 0,
+        userIcons: 0,
+        albumCovers: 0
+      }
     }
   }
 
