@@ -14,7 +14,7 @@ export default function ImageStorageDebug() {
     
     try {
       const [storage, cache] = await Promise.all([
-        imageStorageService.getStorageStats(),
+        imageStorageService.getStats(),
         externalImageCacheService.getCacheStats()
       ])
       
