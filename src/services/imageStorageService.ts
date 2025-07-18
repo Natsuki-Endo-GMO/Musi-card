@@ -97,7 +97,7 @@ export class ImageStorageService {
       // キャッシュに保存
       this.uploadCache.set(fileName, url)
 
-      console.log(`📤 ユーザーアイコンをアップロード: ${username} (${processed.size} bytes)`)
+      console.log(`[画像保存] ユーザー: ${username}, ファイル名: ${fileName}, サイズ: ${processed.size}, URL: ${url}`)
 
       return {
         url,
@@ -163,7 +163,7 @@ export class ImageStorageService {
       // キャッシュに保存
       this.uploadCache.set(fileName, url)
 
-      console.log(`📤 アルバムジャケットをアップロード: ${username}/${songId} (${processed.size} bytes)`)
+      console.log(`[画像保存] ユーザー: ${username}, ファイル名: ${fileName}, サイズ: ${processed.size}, URL: ${url}`)
 
       return {
         url,
