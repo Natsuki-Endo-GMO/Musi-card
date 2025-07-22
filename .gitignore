@@ -11,6 +11,9 @@
 /playwright-report/
 /playwright/.cache/
 
+# Test configuration (contains sensitive data)
+/tests/config/test-users.json
+
 # next.js
 /.next/
 /out/

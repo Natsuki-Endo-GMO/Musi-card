@@ -5,8 +5,7 @@ import path from 'path';
 test.describe('画像アップロードテスト', () => {
   test('画像アップロード機能が利用可能（ログイン後）', async ({ page }) => {
     // テストユーザーでログイン
-    const testUsername = `testuser_${Date.now()}`;
-    await setupTestUser(page, testUsername);
+    const user = await setupTestUser(page, 0);
     
     // 画像アップロード要素が存在することを確認
     const uploadInput = page.locator('input[type="file"]');
@@ -15,8 +14,7 @@ test.describe('画像アップロードテスト', () => {
 
   test('画像アップロードAPIが正常に動作する', async ({ page }) => {
     // テストユーザーでログイン
-    const testUsername = `testuser_${Date.now()}`;
-    await setupTestUser(page, testUsername);
+    const user = await setupTestUser(page, 0);
     
     // テスト用の画像ファイルを作成
     const testImageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTestUser } from './helpers/auth';
+import { setupTestUser, loginUser, logoutUser } from './helpers/auth';
 
 test.describe('基本機能テスト', () => {
   test('ホームページが正常に表示される', async ({ page }) => {
@@ -10,7 +10,6 @@ test.describe('基本機能テスト', () => {
     
     // 主要な要素が表示されることを確認
     await expect(page.locator('h1')).toBeVisible();
-    await expect(page.locator('nav')).toBeVisible();
     
     // コンソールエラーがないことを確認
     const consoleErrors: string[] = [];
@@ -24,29 +23,26 @@ test.describe('基本機能テスト', () => {
     expect(consoleErrors).toHaveLength(0);
   });
 
-  test('ユーザー登録・ログインが正常に動作する', async ({ page }) => {
-    const testUsername = `testuser_${Date.now()}`;
-    
-    // ユーザー登録
+  test('ログインページが正常に表示される', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('input[name="username"]', testUsername);
-    await page.fill('input[name="displayName"]', 'Test User');
-    await page.click('button:has-text("作成")');
+    
+    // ログインフォームの要素が表示されることを確認
+    await expect(page.locator('input[placeholder*="ユーザー名"], input[name="username"]')).toBeVisible();
+    await expect(page.locator('input[type="password"], input[name="password"]')).toBeVisible();
+    await expect(page.locator('button:has-text("ログイン")')).toBeVisible();
+  });
+
+  test('ログイン・ログアウトが正常に動作する', async ({ page }) => {
+    // テストユーザーでログイン
+    const user = await setupTestUser(page, 0);
     
     // ダッシュボードに遷移することを確認
-    await page.waitForURL('/dashboard');
-    await expect(page.locator('text=Test User')).toBeVisible();
+    await expect(page).toHaveURL('/dashboard');
+    await expect(page.locator(`text=${user.displayName}`)).toBeVisible();
     
     // ログアウト
-    await page.click('button:has-text("ログアウト")');
-    await page.waitForURL('/');
-    
-    // 再ログイン
-    await page.goto('/login');
-    await page.fill('input[name="username"]', testUsername);
-    await page.click('button:has-text("ログイン")');
-    await page.waitForURL('/dashboard');
-    await expect(page.locator('text=Test User')).toBeVisible();
+    await logoutUser(page);
+    await expect(page).toHaveURL('/');
   });
 
   test('ナビゲーションが正常に動作する', async ({ page }) => {

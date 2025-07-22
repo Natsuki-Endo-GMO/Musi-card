@@ -4,8 +4,7 @@ import { setupTestUser } from './helpers/auth';
 test.describe('Spotify認証テスト', () => {
   test('Spotify認証ボタンが表示される（ログイン後）', async ({ page }) => {
     // テストユーザーでログイン
-    const testUsername = `testuser_${Date.now()}`;
-    await setupTestUser(page, testUsername);
+    const user = await setupTestUser(page, 0);
     
     // Spotify認証ボタンが表示されることを確認
     const spotifyButton = page.locator('button:has-text("Spotify")');
@@ -14,8 +13,7 @@ test.describe('Spotify認証テスト', () => {
 
   test('Spotify認証URLが正しく生成される（ログイン後）', async ({ page }) => {
     // テストユーザーでログイン
-    const testUsername = `testuser_${Date.now()}`;
-    await setupTestUser(page, testUsername);
+    const user = await setupTestUser(page, 0);
     
     // Spotify認証ボタンをクリック
     const spotifyButton = page.locator('button:has-text("Spotify")');
