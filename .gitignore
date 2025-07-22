@@ -49,3 +49,6 @@ Thumbs.db
 # typescript
 *.tsbuildinfo
 next-env.d.ts 
+
+# テスト用音源アセット
+/test-assets/ 
