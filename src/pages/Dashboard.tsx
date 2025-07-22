@@ -27,12 +27,16 @@ export default function Dashboard() {
   }, [])
 
   const checkAuth = async () => {
+    console.log('🔍 checkAuth実行開始');
     const user = localStorage.getItem('musicard_user')
+    console.log('🔍 localStorageから取得したユーザー:', user);
     if (!user) {
+      console.log('🔍 ユーザーが見つからないため、ログインページに遷移');
       navigate('/login')
       return
     }
 
+    console.log('🔍 ユーザー認証成功:', user);
     setCurrentUser(user)
     await loadUserData(user)
   }
@@ -105,10 +109,17 @@ export default function Dashboard() {
   }
 
   const handleLogout = () => {
+    console.log('🔍 handleLogout関数が呼び出されました');
     if (confirm('ログアウトしますか？')) {
+      console.log('🔍 ログアウト処理開始');
       localStorage.removeItem('musicard_user')
       localStorage.removeItem('musicard_login_time')
-      navigate('/login')
+      console.log('🔍 localStorage削除完了、ホームページに遷移:', '/');
+      // ログアウト後は認証チェックを回避するため、直接ホームページに遷移
+      window.location.href = '/'
+      console.log('🔍 window.location.href実行完了');
+    } else {
+      console.log('🔍 ログアウトがキャンセルされました');
     }
   }
 
