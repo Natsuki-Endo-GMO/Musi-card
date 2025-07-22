@@ -1,9 +1,9 @@
 {
   "installCommand": "npm install --ignore-scripts",
   "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/chorus-test.html", "destination": "/chorus-test.html" },
+    { "source": "/test-assets/(.*)", "destination": "/test-assets/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 } 

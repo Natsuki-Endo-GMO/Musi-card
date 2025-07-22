@@ -52,3 +52,11 @@ next-env.d.ts
 
 # テスト用音源アセット
 /test-assets/ 
+dist/test-assets/noise.mp3
+dist/test-assets/short.mp3
+dist/test-assets/silence.mp3
+public/test-assets/noise.mp3
+public/test-assets/short.mp3
+public/test-assets/silence.mp3
+dist/test-assets/jpop_sample.m4a
+public/test-assets/jpop_sample.m4a

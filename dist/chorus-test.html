@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>サビ検出テストUI</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { font-family: sans-serif; background: #f7fafc; margin: 0; padding: 2em; }
+    .container { max-width: 480px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001; padding: 2em; }
+    input, button { font-size: 1em; padding: 0.5em; margin: 0.5em 0; }
+    pre { background: #f0f0f0; padding: 1em; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>サビ検出APIテスト</h1>
+    <form id="form">
+      <label for="file">音源ファイルパス/URL:</label><br>
+      <input type="text" id="file" name="file" style="width:100%" placeholder="test-assets/jpop_sample.m4a" required><br>
+      <button type="submit">サビ検出</button>
+    </form>
+    <div id="result"></div>
+  </div>
+  <script>
+    const form = document.getElementById('form');
+    const resultDiv = document.getElementById('result');
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      resultDiv.innerHTML = '検出中...';
+      const file = document.getElementById('file').value;
+      try {
+        const res = await fetch(`/api/chorus-detect?file=${encodeURIComponent(file)}`);
+        const data = await res.json();
+        resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (err) {
+        resultDiv.innerHTML = `<span style='color:red'>エラー: ${err}</span>`;
+      }
+    };
+  </script>
+</body>
+</html> 

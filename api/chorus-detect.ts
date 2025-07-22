@@ -7,8 +7,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'file query required' });
   }
   try {
+    // public配下のファイルパスに解決
+    const safeFile = file.replace(/^\/+/, ''); // 先頭の/を除去
     const detector = new LightweightChorusDetector();
-    const result = await detector.detectChorus(file);
+    // Node.js環境では public/ をルートにしてパス解決
+    const result = await detector.detectChorus(`public/${safeFile}`);
     res.status(200).json(result);
   } catch (e) {
     res.status(500).json({ error: String(e) });
