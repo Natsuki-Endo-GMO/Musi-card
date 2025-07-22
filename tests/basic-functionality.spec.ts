@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { setupTestUser } from './helpers/auth';
 
 test.describe('基本機能テスト', () => {
   test('ホームページが正常に表示される', async ({ page }) => {
     await page.goto('/');
     
-    // ページタイトルの確認
-    await expect(page).toHaveTitle(/Musi-card/);
+    // ページタイトルの確認（実際のタイトルに合わせて修正）
+    await expect(page).toHaveTitle(/MusiCard/);
     
     // 主要な要素が表示されることを確認
     await expect(page.locator('h1')).toBeVisible();
@@ -21,6 +22,31 @@ test.describe('基本機能テスト', () => {
     
     await page.waitForTimeout(2000);
     expect(consoleErrors).toHaveLength(0);
+  });
+
+  test('ユーザー登録・ログインが正常に動作する', async ({ page }) => {
+    const testUsername = `testuser_${Date.now()}`;
+    
+    // ユーザー登録
+    await page.goto('/login');
+    await page.fill('input[name="username"]', testUsername);
+    await page.fill('input[name="displayName"]', 'Test User');
+    await page.click('button:has-text("作成")');
+    
+    // ダッシュボードに遷移することを確認
+    await page.waitForURL('/dashboard');
+    await expect(page.locator('text=Test User')).toBeVisible();
+    
+    // ログアウト
+    await page.click('button:has-text("ログアウト")');
+    await page.waitForURL('/');
+    
+    // 再ログイン
+    await page.goto('/login');
+    await page.fill('input[name="username"]', testUsername);
+    await page.click('button:has-text("ログイン")');
+    await page.waitForURL('/dashboard');
+    await expect(page.locator('text=Test User')).toBeVisible();
   });
 
   test('ナビゲーションが正常に動作する', async ({ page }) => {

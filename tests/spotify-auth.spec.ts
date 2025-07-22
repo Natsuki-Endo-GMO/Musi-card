@@ -1,16 +1,21 @@
 import { test, expect } from '@playwright/test';
+import { setupTestUser } from './helpers/auth';
 
 test.describe('Spotify認証テスト', () => {
-  test('Spotify認証ボタンが表示される', async ({ page }) => {
-    await page.goto('/');
+  test('Spotify認証ボタンが表示される（ログイン後）', async ({ page }) => {
+    // テストユーザーでログイン
+    const testUsername = `testuser_${Date.now()}`;
+    await setupTestUser(page, testUsername);
     
     // Spotify認証ボタンが表示されることを確認
     const spotifyButton = page.locator('button:has-text("Spotify")');
     await expect(spotifyButton).toBeVisible();
   });
 
-  test('Spotify認証URLが正しく生成される', async ({ page }) => {
-    await page.goto('/');
+  test('Spotify認証URLが正しく生成される（ログイン後）', async ({ page }) => {
+    // テストユーザーでログイン
+    const testUsername = `testuser_${Date.now()}`;
+    await setupTestUser(page, testUsername);
     
     // Spotify認証ボタンをクリック
     const spotifyButton = page.locator('button:has-text("Spotify")');
