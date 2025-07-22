@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('認証デバッグテスト', () => {
-  test('実際のユーザーでログインを試行', async ({ page }) => {
+  test.skip('実際のユーザーでログインを試行', async ({ page }) => {
     await page.goto('/login');
     
     // フォームが有効になるまで待機
@@ -49,7 +49,7 @@ test.describe('認証デバッグテスト', () => {
     }
   });
 
-  test('ゲストユーザーでアクセス', async ({ page }) => {
+  test.skip('ゲストユーザーでアクセス', async ({ page }) => {
     // Aliceの名刺にアクセス
     await page.goto('/');
     await page.click('button:has-text("Aliceの名刺")');

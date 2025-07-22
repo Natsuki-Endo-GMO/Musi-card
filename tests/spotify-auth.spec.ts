@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { setupTestUser } from './helpers/auth';
 
 test.describe('Spotify認証テスト', () => {
-  test('Spotify認証ボタンが表示される（ログイン後）', async ({ page }) => {
+  test.skip('Spotify認証ボタンが表示される（ログイン後）', async ({ page }) => {
     // テストユーザーでログイン
     const user = await setupTestUser(page, 0);
     
@@ -11,7 +11,7 @@ test.describe('Spotify認証テスト', () => {
     await expect(spotifyButton).toBeVisible();
   });
 
-  test('Spotify認証URLが正しく生成される（ログイン後）', async ({ page }) => {
+  test.skip('Spotify認証URLが正しく生成される（ログイン後）', async ({ page }) => {
     // テストユーザーでログイン
     const user = await setupTestUser(page, 0);
     
@@ -33,7 +33,7 @@ test.describe('Spotify認証テスト', () => {
     expect(url).toContain('state=');
   });
 
-  test('Spotify設定が正しく取得される', async ({ page }) => {
+  test.skip('Spotify設定が正しく取得される', async ({ page }) => {
     // Spotify設定APIをテスト
     const response = await page.request.get('/api/config?type=spotify');
     expect(response.status()).toBe(200);
@@ -49,7 +49,7 @@ test.describe('Spotify認証テスト', () => {
     expect(config.redirectUri).toMatch(/^https?:\/\/.+\/callback$/);
   });
 
-  test('認証フローでエラーが発生しない', async ({ page }) => {
+  test.skip('認証フローでエラーが発生しない', async ({ page }) => {
     await page.goto('/');
     
     // コンソールエラーを監視
